@@ -4,3 +4,5 @@ capture.bak.tar
 capture.bak2.tar
 captures/
 static/novnc/
+.cursor/
+__pycache__/
