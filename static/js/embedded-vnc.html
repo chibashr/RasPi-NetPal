@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Embedded VNC Viewer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Load vnc_lite.html which is a minimal, standalone VNC client -->
+    <iframe src="/static/novnc/vnc_lite.html?host=localhost&port=6080&autoconnect=true&resize=scale&path="></iframe>
+</body>
+</html> 

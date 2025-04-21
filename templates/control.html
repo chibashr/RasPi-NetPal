@@ -1,0 +1,1428 @@
+{% extends "base.html" %}
+
+{% block title %}Pi Control{% endblock %}
+{% block nav_control %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .terminal-container {
+        background-color: #121212 !important;
+        color: #2ECC40 !important;
+        font-family: monospace !important;
+        padding: 10px 15px;
+        border-radius: 8px;
+        height: 400px;
+        overflow-y: scroll !important; /* Force scrolling */
+        margin-bottom: 20px;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        position: relative;
+        cursor: text;
+        box-shadow: 0 0 15px rgba(46, 204, 64, 0.15) !important;
+        border: 1px solid #333 !important;
+        font-size: 14px;
+        line-height: 1.2;
+        letter-spacing: 0.5px;
+        overflow-x: auto; /* Allow horizontal scrolling if needed */
+        transition: border-color 0.3s ease;
+        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+        scrollbar-width: thin; /* Firefox */
+        scrollbar-color: #2ECC40 #121212; /* Firefox */
+    }
+    
+    /* Customize scrollbars for webkit browsers */
+    .terminal-container::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+    }
+    
+    .terminal-container::-webkit-scrollbar-track {
+        background: #121212;
+        border-radius: 4px;
+    }
+    
+    .terminal-container::-webkit-scrollbar-thumb {
+        background-color: #2ECC40;
+        border-radius: 4px;
+        border: 2px solid #121212;
+    }
+    
+    .terminal-container.focused {
+        border-color: #2ECC40 !important;
+        box-shadow: 0 0 20px rgba(46, 204, 64, 0.25) !important;
+    }
+    
+    /* Terminal effects */
+    .terminal-scanlines {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0) 50%);
+        background-size: 100% 4px;
+        pointer-events: none;
+        opacity: 0.3;
+        z-index: 2;
+    }
+    
+    .terminal-glow {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(ellipse at center, rgba(51, 255, 51, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
+        pointer-events: none;
+        z-index: 1;
+    }
+    
+    .terminal-cursor {
+        display: inline-block;
+        width: 8px;
+        height: 16px;
+        background-color: #2ECC40;
+        animation: blink 1s step-end infinite;
+        vertical-align: middle;
+        margin-left: 1px;
+        position: relative;
+    }
+    
+    .terminal-cursor.focus-lost {
+        opacity: 0.3;
+        animation: none;
+    }
+    
+    @keyframes blink {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0; }
+    }
+    
+    .terminal-input-wrapper {
+        position: relative;
+        display: flex;
+        flex-direction: row;
+        min-height: 18px;
+        line-height: 18px;
+        align-items: center;
+    }
+    
+    .terminal-input-text {
+        flex-grow: 1;
+        color: #2ECC40;
+        background: transparent;
+        white-space: pre;
+        font-family: monospace;
+        display: inline-block;
+    }
+
+    .terminal-prompt {
+        color: #2ECC40 !important;
+        margin-right: 5px;
+        display: inline-block;
+        font-weight: bold;
+    }
+    
+    .terminal-input-inline {
+        background-color: transparent !important;
+        color: transparent !important;
+        caret-color: transparent !important;
+        border: none !important;
+        font-family: monospace !important;
+        outline: none !important;
+        width: 1px !important;
+        height: 1px !important;
+        position: absolute !important;
+        opacity: 0.01 !important;
+        z-index: -1;
+    }
+    
+    .controls-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .controls-row .btn-group {
+        display: flex;
+        gap: 10px;
+    }
+    
+    /* Custom clear button for terminal */
+    #clear-terminal {
+        background-color: #444 !important;
+        color: #eee !important;
+        border: 1px solid #333 !important;
+        border-radius: 4px;
+        padding: 5px 10px;
+        cursor: pointer;
+        font-size: 12px;
+        transition: all 0.2s;
+    }
+    
+    #clear-terminal:hover {
+        background-color: #555 !important;
+    }
+    
+    /* Hide default button styles */
+    .btn.secondary {
+        background: none;
+        border: none;
+    }
+    
+    /* Rest of your existing styles */
+    .control-panel {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 20px;
+    }
+    
+    .control-section {
+        background-color: var(--card-bg);
+        border-radius: 5px;
+        padding: 15px;
+        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .control-section h3 {
+        margin-top: 0;
+        border-bottom: 1px solid var(--border-color);
+        padding-bottom: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .vnc-viewer {
+        border: 1px solid var(--border-color);
+        border-radius: 5px;
+        width: 100%;
+        height: 500px;
+        display: none;
+    }
+    
+    .tab-nav {
+        display: flex;
+        margin-bottom: 15px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .tab-btn {
+        padding: 10px 15px;
+        background: none;
+        border: none;
+        cursor: pointer;
+        border-bottom: 3px solid transparent;
+        color: var(--text-color);
+    }
+    
+    .tab-btn.active {
+        border-bottom: 3px solid var(--accent-color);
+        font-weight: bold;
+    }
+    
+    .tab-content {
+        display: none;
+    }
+    
+    .tab-content.active {
+        display: block;
+    }
+
+    .dark-mode .terminal-container {
+        background-color: #0d0d0d;
+        color: #33ff33;
+        box-shadow: 0 0 10px rgba(0, 255, 0, 0.2), inset 0 0 30px rgba(0, 0, 0, 0.5);
+    }
+    
+    .dark-mode .terminal-input {
+        background-color: #0d0d0d;
+        color: #33ff33;
+        border-color: #444;
+    }
+    
+    /* Focus indicator */
+    .terminal-focus-message {
+        position: absolute;
+        bottom: 15px;
+        right: 15px;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: #2ECC40;
+        padding: 5px 10px;
+        border-radius: 4px;
+        font-size: 12px;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+        pointer-events: none;
+        z-index: 10;
+    }
+    
+    .terminal-focus-message.visible {
+        opacity: 1;
+    }
+
+    .focus-message {
+        position: absolute;
+        bottom: 10px;
+        right: 10px;
+        background-color: rgba(0, 0, 0, 0.8);
+        color: #2ECC40;
+        padding: 8px 12px;
+        border-radius: 4px;
+        font-size: 14px;
+        z-index: 100;
+        border: 1px solid #2ECC40;
+        box-shadow: 0 0 10px rgba(46, 204, 64, 0.5);
+        pointer-events: none;
+    }
+    
+    /* Network Scan Styles */
+    .form-row {
+        display: flex;
+        gap: 15px;
+        margin-bottom: 15px;
+    }
+    
+    .form-group {
+        display: flex;
+        flex-direction: column;
+        margin-bottom: 15px;
+    }
+    
+    .form-group label {
+        margin-bottom: 5px;
+        font-weight: 500;
+    }
+    
+    .form-control {
+        padding: 8px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background-color: var(--input-bg);
+        color: var(--text-color);
+    }
+    
+    .progress-bar {
+        height: 10px;
+        background-color: #eee;
+        border-radius: 5px;
+        overflow: hidden;
+        margin-bottom: 10px;
+    }
+    
+    .progress-fill {
+        height: 100%;
+        background-color: var(--accent-color);
+        width: 100%;
+        animation: progress-animation 1.5s infinite;
+    }
+    
+    @keyframes progress-animation {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
+    }
+    
+    .table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 20px;
+    }
+    
+    .table th, .table td {
+        padding: 8px 12px;
+        text-align: left;
+        border-bottom: 1px solid var(--border-color);
+    }
+    
+    .table th {
+        background-color: var(--table-header-bg);
+        color: var(--text-color);
+        font-weight: 500;
+    }
+    
+    .table-responsive {
+        overflow-x: auto;
+        margin-bottom: 15px;
+    }
+    
+    /* Dark mode adjustments */
+    .dark-mode .form-control {
+        background-color: #333;
+        color: #fff;
+        border-color: #444;
+    }
+    
+    .dark-mode .progress-bar {
+        background-color: #444;
+    }
+    
+    .dark-mode .table th {
+        background-color: #333;
+    }
+</style>
+{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
+<script>
+    // Force CSS reload by adding timestamp to CSS links
+    document.addEventListener('DOMContentLoaded', function() {
+        const timestamp = new Date().getTime();
+        const links = document.getElementsByTagName('link');
+        for (let i = 0; i < links.length; i++) {
+            if (links[i].rel === 'stylesheet') {
+                links[i].href = links[i].href + '?t=' + timestamp;
+            }
+        }
+    });
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Raspberry Pi Control</h2>
+    <p>Manage your Raspberry Pi with direct console and VNC access</p>
+    
+    <div class="tab-nav">
+        <button class="tab-btn active" data-tab="console">Console</button>
+        <button class="tab-btn" data-tab="vnc">VNC</button>
+    </div>
+    
+    <div class="tab-content active" id="console-tab">
+        <div class="control-section">
+            <h3>Console Access</h3>
+            <p>Interact directly with the Raspberry Pi command line.</p>
+            
+            <div id="terminal" class="terminal-container" tabindex="0" style="background-color: #121212; color: #2ECC40; font-family: monospace; box-shadow: 0 0 15px rgba(46, 204, 64, 0.15); border: 1px solid #333;">
+                <div class="terminal-scanlines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0) 50%); background-size: 100% 4px; opacity: 0.3; z-index: 2; pointer-events: none;"></div>
+                <div class="terminal-glow" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(ellipse at center, rgba(46, 204, 64, 0.07) 0%, rgba(0, 0, 0, 0.2) 100%); pointer-events: none; z-index: 1;"></div>
+            </div>
+            
+            <div class="controls-row">
+                <div class="btn-group">
+                    <button id="clear-terminal" class="btn secondary" style="background-color: #444; color: #eee; border: 1px solid #333;">Clear</button>
+                    <button id="settings-toggle" class="btn secondary" style="background-color: #444; color: #eee; border: 1px solid #333;">Settings</button>
+                    <button id="download-output" class="btn secondary" style="background-color: #444; color: #eee; border: 1px solid #333;">Download Output</button>
+                </div>
+            </div>
+            
+            <!-- Terminal Settings Panel -->
+            <div id="terminal-settings" class="terminal-settings" style="display: none; margin-top: 15px; background: #222; border: 1px solid #333; border-radius: 4px; padding: 15px;">
+                <h4 style="margin-top: 0; color: #eee; border-bottom: 1px solid #444; padding-bottom: 10px;">Terminal Settings</h4>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                    <div>
+                        <label for="terminal-font-size" style="display: block; margin-bottom: 5px; color: #eee;">Font Size</label>
+                        <select id="terminal-font-size" class="terminal-setting" data-setting="fontSize" style="width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 5px; border-radius: 3px;">
+                            <option value="12px">Small (12px)</option>
+                            <option value="14px" selected>Medium (14px)</option>
+                            <option value="16px">Large (16px)</option>
+                            <option value="18px">Extra Large (18px)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="terminal-color-scheme" style="display: block; margin-bottom: 5px; color: #eee;">Color Scheme</label>
+                        <select id="terminal-color-scheme" class="terminal-setting" data-setting="colorScheme" style="width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 5px; border-radius: 3px;">
+                            <option value="green" selected>Green (Classic)</option>
+                            <option value="amber">Amber</option>
+                            <option value="white">White</option>
+                            <option value="blue">Blue</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="terminal-cursor-style" style="display: block; margin-bottom: 5px; color: #eee;">Cursor Style</label>
+                        <select id="terminal-cursor-style" class="terminal-setting" data-setting="cursorStyle" style="width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 5px; border-radius: 3px;">
+                            <option value="block" selected>Block</option>
+                            <option value="underline">Underline</option>
+                            <option value="bar">Bar</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="terminal-cursor-blink" style="display: block; margin-bottom: 5px; color: #eee;">Cursor Blink</label>
+                        <select id="terminal-cursor-blink" class="terminal-setting" data-setting="cursorBlink" style="width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 5px; border-radius: 3px;">
+                            <option value="true" selected>On</option>
+                            <option value="false">Off</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tab-content" id="vnc-tab">
+        <div class="control-section">
+            <h3>VNC Access</h3>
+            <p>Remote desktop access to your Raspberry Pi.</p>
+            
+            <div class="controls-row">
+                <div>
+                    <span id="vnc-status">VNC Server: <span class="badge error">Not Running</span></span>
+                </div>
+                <div class="btn-group">
+                    <button id="start-vnc" class="btn primary">Start VNC Server</button>
+                    <button id="stop-vnc" class="btn danger" style="display: none;">Stop VNC Server</button>
+                </div>
+            </div>
+            
+            <div id="vnc-viewer-container" style="margin-top: 20px; display: none;">
+                <p>VNC display:</p>
+                <iframe id="vnc-iframe" class="vnc-viewer" style="display: block; width: 100%; height: 600px; border: 1px solid #ccc;"></iframe>
+                
+                <p style="margin-top: 10px;"><small>Note: If the embedded viewer doesn't work, connect with your favorite VNC client:</small></p>
+                <ul style="margin-top: 5px;">
+                    <li>Host: <span id="vnc-host">localhost</span></li>
+                    <li>Port: <span id="vnc-port">6080</span></li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Tab navigation
+    document.querySelectorAll('.tab-btn').forEach(button => {
+        button.addEventListener('click', () => {
+            // Remove active class from all buttons and tabs
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            
+            // Add active class to clicked button and corresponding tab
+            button.classList.add('active');
+            document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
+        });
+    });
+    
+    // Console functionality
+    const terminal = document.getElementById('terminal');
+    const terminalInput = document.createElement('input');
+    terminalInput.type = 'text';
+    terminalInput.className = 'terminal-input-inline';
+    terminalInput.setAttribute('aria-label', 'Terminal input');
+    terminalInput.setAttribute('autocomplete', 'off');
+    terminalInput.setAttribute('spellcheck', 'false');
+    
+    let socket = null;
+    let commandHistory = [];
+    let historyPosition = -1;
+    
+    // Initialize with default values that will be updated when connected
+    let hostname = 'raspberrypi';
+    let username = 'admin';
+    let currentPrompt = 'admin@raspberrypi:/opt/captive$ ';
+    let currentDirectory = '/opt/captive';
+    let currentUser = `${username}@${hostname}`;
+    
+    let terminalContent = '';
+    let isProcessingCommand = false;
+    
+    function updatePrompt(directory) {
+        if (directory) {
+            currentDirectory = directory;
+        }
+        
+        // Format the prompt like a real bash shell: username@hostname:directory$
+        currentUser = `${username}@${hostname}`;
+        currentPrompt = `${currentUser}:${currentDirectory}$ `;
+        console.log("Updated prompt to:", currentPrompt);
+        
+        return currentPrompt;
+    }
+    
+    function setupWebSocket() {
+        // Close existing socket if any
+        if (socket) {
+            socket.disconnect();
+            socket = null;
+        }
+        
+        // Show connecting message
+        terminal.innerHTML = '<div class="terminal-scanlines"></div><div class="terminal-glow"></div>Connecting to console...';
+        terminalContent = 'Connecting to console...\n';
+        
+        // Apply styles to the terminal effects
+        const scanlines = terminal.querySelector('.terminal-scanlines');
+        const glow = terminal.querySelector('.terminal-glow');
+        
+        if (scanlines) {
+            scanlines.style.position = 'absolute';
+            scanlines.style.top = '0';
+            scanlines.style.left = '0';
+            scanlines.style.width = '100%';
+            scanlines.style.height = '100%';
+            scanlines.style.background = 'linear-gradient(rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0) 50%)';
+            scanlines.style.backgroundSize = '100% 4px';
+            scanlines.style.opacity = '0.3';
+            scanlines.style.zIndex = '2';
+            scanlines.style.pointerEvents = 'none';
+        }
+        
+        if (glow) {
+            glow.style.position = 'absolute';
+            glow.style.top = '0';
+            glow.style.left = '0';
+            glow.style.width = '100%';
+            glow.style.height = '100%';
+            glow.style.background = 'radial-gradient(ellipse at center, rgba(46, 204, 64, 0.07) 0%, rgba(0, 0, 0, 0.2) 100%)';
+            glow.style.pointerEvents = 'none';
+            glow.style.zIndex = '1';
+        }
+        
+        // Using Socket.IO instead of raw WebSocket with autoConnect: false
+        const socketOptions = { 
+            path: '/socket.io',
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+            timeout: 20000,
+            autoConnect: false,
+            forceNew: true
+        };
+        
+        // Get the current host from the window location
+        const currentHost = window.location.host;
+        const currentProtocol = window.location.protocol;
+        const socketUrl = `${currentProtocol}//${currentHost}`;
+        
+        // Generate a unique session ID if not already present
+        if (!window.sessionStorage.getItem('consoleSessionId')) {
+            window.sessionStorage.setItem('consoleSessionId', 
+                Math.random().toString(36).substring(2, 15) + 
+                Math.random().toString(36).substring(2, 15));
+        }
+        const sessionId = window.sessionStorage.getItem('consoleSessionId');
+        
+        // Add session ID to socket options
+        socketOptions.query = { 'sessionId': sessionId };
+        
+        socket = io(`${socketUrl}/console`, socketOptions);
+        
+        // Set up event handlers
+        socket.on('connect', function() {
+            console.log("Socket.IO connection established");
+            // Clear any existing error messages
+            terminalContent = '';
+            updateTerminalDisplay();
+            
+            // Force a command to ensure we get a prompt
+            setTimeout(() => {
+                socket.emit('message', 'echo "Console ready"');
+            }, 500);
+        });
+        
+        socket.on('connect_error', function(error) {
+            console.error('Socket.IO Error:', error);
+            if (!terminalContent.includes('Error: Connection failed')) {
+                terminalContent += 'Error: Connection failed. Retrying...\n';
+                updateTerminalDisplay();
+            }
+            
+            // Retry connection after a delay
+            setTimeout(() => {
+                if (socket && !socket.connected) {
+                    socket.connect();
+                }
+            }, 2000);
+        });
+        
+        socket.on('message', function(data) {
+            console.log("Received data:", data);
+            
+            // Check if this is a directory change notification
+            if (data.startsWith('Changed directory to ')) {
+                const newDir = data.replace('Changed directory to ', '').trim();
+                console.log("Directory changed to:", newDir);
+                updatePrompt(newDir);
+                
+                // Don't add directory change messages to terminal content
+                isProcessingCommand = false;
+                updateTerminalDisplay();
+                
+                // Scroll to the bottom
+                terminal.scrollTop = terminal.scrollHeight;
+                
+                return;
+            }
+            
+            // Handle the command output formatting
+            // Force proper line breaks for command output
+            let formattedData = data;
+            
+            // Check if this is ls command output without proper line breaks
+            const lastCommand = window.lastCommand || '';
+            
+            // Special handling for ls command output
+            if (isProcessingCommand && 
+                (lastCommand.trim() === 'ls' || lastCommand.startsWith('ls ')) && 
+                data.trim().length > 0) {
+                
+                // First check if data already has newlines
+                if (!data.includes('\n')) {
+                    // No newlines - this is probably all on one line
+                    // Split by common file patterns and add newlines
+                    formattedData = '';
+                    
+                    // Split by common patterns that should be on separate lines
+                    const items = data.split(/\s+/);
+                    
+                    for (let i = 0; i < items.length; i++) {
+                        if (items[i].trim()) {
+                            formattedData += items[i] + '\n';
+                        }
+                    }
+                } else {
+                    // Already has some newlines, but might need more formatting
+                    // Ensure each item is on its own line
+                    const lines = data.split('\n');
+                    formattedData = '';
+                    
+                    for (let i = 0; i < lines.length; i++) {
+                        const line = lines[i].trim();
+                        if (line) {
+                            // If this line has multiple items (space-separated), split them
+                            if (line.includes(' ') && !line.startsWith('-')) {
+                                const items = line.split(/\s+/);
+                                for (let j = 0; j < items.length; j++) {
+                                    if (items[j].trim()) {
+                                        formattedData += items[j] + '\n';
+                                    }
+                                }
+                            } else {
+                                formattedData += line + '\n';
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // Process the incoming data to maintain clean formatting
+            // Use the formatted data if available, otherwise use original data
+            const trimmedData = (formattedData || data).replace(/^\s+|\s+$/g, '');
+            
+            // Add to terminal content only if non-empty
+            if (trimmedData) {
+                if (terminalContent && !terminalContent.endsWith('\n')) {
+                    terminalContent += '\n' + trimmedData;
+                } else {
+                    terminalContent += trimmedData;
+                }
+            }
+            
+            // Update the terminal display
+            updateTerminalDisplay();
+            
+            // Scroll to the bottom
+            terminal.scrollTop = terminal.scrollHeight;
+        });
+        
+        socket.on('command_complete', function() {
+            // Command is complete, mark as not processing and update display
+            isProcessingCommand = false;
+            
+            // Ensure we end with a newline for clean prompt separation
+            if (terminalContent && !terminalContent.endsWith('\n')) {
+                terminalContent += '\n';
+            }
+            
+            // Reset lastCommand as the command is now complete
+            window.lastCommand = '';
+            
+            updateTerminalDisplay();
+            
+            // Ensure input focus
+            terminalInput.focus();
+        });
+        
+        socket.on('disconnect', function() {
+            console.log("Socket disconnected");
+            terminalContent += '\nConnection closed. Reconnecting...\n';
+            updateTerminalDisplay();
+            
+            // Attempt to reconnect after delay
+            setTimeout(function() {
+                // Connect only if not already connected
+                if (socket && !socket.connected) {
+                    socket.connect();
+                }
+            }, 2000);
+        });
+        
+        // Connect after setting up handlers
+        socket.connect();
+        
+        // Add focus message element to terminal
+        const focusMessage = document.createElement('div');
+        focusMessage.className = 'terminal-focus-message';
+        focusMessage.textContent = 'Click to resume';
+        terminal.appendChild(focusMessage);
+    }
+    
+    // Function to format the terminal content with proper line breaks
+    function formatTerminalContent() {
+        // This helps ensure proper line breaks for different command outputs
+        let formatted = terminalContent;
+        
+        // Look for patterns that suggest we need to add line breaks
+        
+        // First, detect multi-column outputs and convert them to single-column
+        // This pattern looks for multiple words separated by multiple spaces (typical of ls -l output)
+        const columnPattern = /([^\s]+)(\s{2,})([^\s]+)/g;
+        while (columnPattern.test(formatted)) {
+            formatted = formatted.replace(columnPattern, '$1\n$3');
+        }
+        
+        // Handle special case for file listings from "ls" command
+        // Convert file listings with no breaks to properly formatted listings
+        const fileListPattern = /(^|\n)([\w\-\.]+)\s+([\w\-\.]+)/g;
+        formatted = formatted.replace(fileListPattern, '$1$2\n$3');
+        
+        // Apply specific formatting for common Linux commands
+        if (formatted.includes(' ls') || formatted.includes('$ ls')) {
+            // For ls command output, ensure each file/directory is on its own line
+            const lines = formatted.split('\n');
+            for (let i = 0; i < lines.length; i++) {
+                // If this line contains the 'ls' command, check the next line
+                if (lines[i].includes(' ls') || lines[i].includes('$ ls')) {
+                    // If the next line exists and doesn't have proper line breaks
+                    if (i + 1 < lines.length && lines[i + 1].trim().length > 0 && !lines[i + 1].includes('\n')) {
+                        // Split the output by whitespace and join with newlines
+                        const outputParts = lines[i + 1].trim().split(/\s+/);
+                        if (outputParts.length > 1) {
+                            lines[i + 1] = outputParts.join('\n');
+                        }
+                    }
+                }
+            }
+            formatted = lines.join('\n');
+        }
+        
+        return formatted;
+    }
+    
+    function updateTerminalDisplay() {
+        // Preserve the scanlines and glow
+        const scanlines = terminal.querySelector('.terminal-scanlines');
+        const glow = terminal.querySelector('.terminal-glow');
+        
+        // Reset terminal 
+        terminal.innerHTML = '';
+        
+        // Re-add styling elements
+        if (scanlines) terminal.appendChild(scanlines);
+        if (glow) terminal.appendChild(glow);
+        
+        // Create a div for the content
+        const contentDiv = document.createElement('div');
+        contentDiv.style.whiteSpace = 'pre-wrap';
+        contentDiv.style.marginBottom = '0'; // Remove space before prompt
+        contentDiv.style.lineHeight = '1.2'; // Consistent with container
+        
+        // Apply any final formatting to the terminal content
+        let processedContent = applyOutputFormatting(terminalContent);
+        
+        contentDiv.textContent = processedContent;
+        terminal.appendChild(contentDiv);
+        
+        // Add prompt if not processing command
+        if (!isProcessingCommand) {
+            const promptDiv = document.createElement('div');
+            promptDiv.style.display = 'flex';
+            promptDiv.style.whiteSpace = 'nowrap';
+            promptDiv.style.alignItems = 'center';
+            promptDiv.style.marginTop = '0'; // No gap before prompt
+            
+            const promptSpan = document.createElement('span');
+            promptSpan.className = 'terminal-prompt';
+            promptSpan.textContent = currentPrompt;
+            promptDiv.appendChild(promptSpan);
+            
+            // Create an input wrapper with visible text and cursor
+            const inputWrapper = document.createElement('div');
+            inputWrapper.className = 'terminal-input-wrapper';
+            
+            // Get cursor position
+            const cursorPos = terminalInput.selectionStart || 0;
+            const inputValue = terminalInput.value || '';
+            
+            // Create a span for text before cursor
+            if (cursorPos > 0) {
+                const beforeCursorSpan = document.createElement('span');
+                beforeCursorSpan.className = 'terminal-input-text';
+                beforeCursorSpan.textContent = inputValue.substring(0, cursorPos);
+                inputWrapper.appendChild(beforeCursorSpan);
+            }
+            
+            // Create the blinking cursor
+            const cursor = document.createElement('span');
+            cursor.className = 'terminal-cursor';
+            inputWrapper.appendChild(cursor);
+            
+            // Create a span for text after cursor
+            if (cursorPos < inputValue.length) {
+                const afterCursorSpan = document.createElement('span');
+                afterCursorSpan.className = 'terminal-input-text';
+                afterCursorSpan.textContent = inputValue.substring(cursorPos);
+                inputWrapper.appendChild(afterCursorSpan);
+            }
+            
+            // Make sure input is not already in the DOM
+            if (terminalInput.parentNode) {
+                terminalInput.parentNode.removeChild(terminalInput);
+            }
+            
+            // Add the actual hidden input field
+            inputWrapper.appendChild(terminalInput);
+            promptDiv.appendChild(inputWrapper);
+            terminal.appendChild(promptDiv);
+            
+            // Ensure cursor is visible by forcing a reflow
+            setTimeout(() => {
+                // Focus the input
+                terminalInput.focus();
+                
+                // Ensure cursor position is preserved
+                terminalInput.selectionStart = terminalInput.selectionEnd = cursorPos;
+            }, 0);
+        }
+        
+        // Scroll to the bottom
+        terminal.scrollTop = terminal.scrollHeight;
+    }
+    
+    // New advanced function to handle terminal output formatting
+    function applyOutputFormatting(content) {
+        // Process the content to ensure proper formatting
+        let formatted = content;
+        
+        // First, normalize newlines
+        formatted = formatted.replace(/\r\n/g, '\n');
+        
+        // Look for file listings without proper line breaks
+        // This handles cases where file names are adjacent without spaces
+        formatted = formatted.replace(/([a-zA-Z0-9_\-\.]+)([a-zA-Z0-9_\-\.]+)/g, function(match, p1, p2) {
+            // Only add a newline if it looks like two different filenames
+            if (p1.length > 1 && p2.length > 1) {
+                return p1 + '\n' + p2;
+            }
+            return match;
+        });
+        
+        // Look for common filename patterns that should be on separate lines
+        formatted = formatted.replace(/(^|\s)(app\.py|routes|static|templates|transfers|captures|data|logs|modules|gunicorn_config\.py|__pycache__|README\.md)(\s|$)/g, 
+            function(match, before, file, after) {
+                // If it's not already at the start of a line, add a newline before
+                if (before && before !== '\n') {
+                    return before + '\n' + file + after;
+                }
+                // If it's not already at the end of a line, add a newline after
+                if (after && after !== '\n') {
+                    return before + file + '\n' + after;
+                }
+                return match;
+            }
+        );
+        
+        // Handle ls -la output format (permissions, owner, group, etc.)
+        formatted = formatted.replace(/^(d|-)[rwx\-]{9}\s+\d+\s+\w+\s+\w+\s+\d+\s+\w+\s+\d+\s+[\d:]+\s+(.+)$/gm, '$1rwx-rwx-rwx user group size date $2');
+        
+        return formatted;
+    }
+    
+    // Update the visible text and cursor position as the user types or moves cursor
+    terminalInput.addEventListener('input', updateTerminalDisplay);
+    terminalInput.addEventListener('click', updateTerminalDisplay);
+    terminalInput.addEventListener('keyup', function(e) {
+        // Only update on navigation keys without modifiers to avoid interfering with shortcuts
+        if ((e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End') && 
+            !e.ctrlKey && !e.altKey && !e.metaKey) {
+            updateTerminalDisplay();
+        }
+    });
+
+    // Fix the click handling for the entire terminal container
+    terminal.addEventListener('click', function(e) {
+        // Always focus on input regardless of where click occurs
+        terminalInput.focus();
+        
+        // Mark terminal as focused
+        terminal.classList.add('focused');
+        
+        // Remove the focus message if it exists
+        const focusMsg = terminal.querySelector('.focus-message');
+        if (focusMsg) {
+            focusMsg.remove();
+        }
+        
+        // Prevent text selection when clicking directly on terminal background
+        if (e.target === terminal) {
+            e.preventDefault();
+        }
+    });
+
+    // Send a command when Enter is pressed
+    terminalInput.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const command = terminalInput.value.trim();
+            
+            if (socket && socket.connected && !isProcessingCommand) {
+                isProcessingCommand = true;
+                
+                // Store the last command for special output formatting
+                window.lastCommand = command;
+                
+                // Add to history even if empty (allows blank lines)
+                if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== command) {
+                    commandHistory.push(command);
+                }
+                historyPosition = commandHistory.length;
+                
+                // Add the command with prompt to terminal content
+                terminalContent += currentPrompt + command + '\n';
+                
+                // Update display
+                updateTerminalDisplay();
+                
+                // Send to server (even if empty)
+                socket.emit('message', command);
+                
+                // Clear input
+                terminalInput.value = '';
+                
+                // Also clear the displayed text
+                const inputTextSpan = document.querySelector('.terminal-input-text');
+                if (inputTextSpan) {
+                    inputTextSpan.textContent = '';
+                }
+            }
+        } else if (e.key === 'ArrowUp') {
+            // Navigate command history
+            if (historyPosition > 0) {
+                historyPosition--;
+                terminalInput.value = commandHistory[historyPosition];
+                
+                // Update the visible text
+                const inputTextSpan = document.querySelector('.terminal-input-text');
+                if (inputTextSpan) {
+                    inputTextSpan.textContent = terminalInput.value;
+                }
+                
+                // Put cursor at the end
+                setTimeout(() => {
+                    terminalInput.selectionStart = terminalInput.selectionEnd = terminalInput.value.length;
+                }, 0);
+            }
+            e.preventDefault();
+        } else if (e.key === 'ArrowDown') {
+            if (historyPosition < commandHistory.length - 1) {
+                historyPosition++;
+                terminalInput.value = commandHistory[historyPosition];
+            } else {
+                historyPosition = commandHistory.length;
+                terminalInput.value = '';
+            }
+            
+            // Update the visible text
+            const inputTextSpan = document.querySelector('.terminal-input-text');
+            if (inputTextSpan) {
+                inputTextSpan.textContent = terminalInput.value;
+            }
+            
+            e.preventDefault();
+        } else if (e.key === 'Tab') {
+            e.preventDefault();
+            
+            // Get current command being typed
+            const currentInput = terminalInput.value;
+            const cursorPos = terminalInput.selectionStart;
+            
+            // Only attempt tab completion if we have a connection and aren't processing a command
+            if (socket && socket.connected && !isProcessingCommand) {
+                // Save the current input to restore if needed
+                const savedInput = currentInput;
+                const savedCursorPos = cursorPos;
+                
+                // Extract the partial path at cursor position for completion
+                let pathToComplete = '';
+                let startPos = cursorPos;
+                
+                // Find the beginning of the current word/path
+                for (let i = cursorPos - 1; i >= 0; i--) {
+                    if (currentInput[i] === ' ' || currentInput[i] === ';' || currentInput[i] === '|') {
+                        break;
+                    }
+                    startPos = i;
+                }
+                
+                // Extract the partial path
+                pathToComplete = currentInput.substring(startPos, cursorPos);
+                
+                // Request tab completion from server
+                socket.emit('tab_completion', {
+                    command: currentInput,
+                    cursorPos: cursorPos,
+                    pathToComplete: pathToComplete
+                });
+                
+                // Set up one-time handler for tab completion response
+                socket.once('tab_completion_result', function(result) {
+                    if (result && result.completions && result.completions.length > 0) {
+                        if (result.completions.length === 1) {
+                            // Single match - auto-complete the command
+                            const completion = result.completions[0];
+                            
+                            // Replace the partial path with the full completion
+                            const newValue = currentInput.substring(0, startPos) + 
+                                            completion + 
+                                            currentInput.substring(cursorPos);
+                            
+                            terminalInput.value = newValue;
+                            terminalInput.selectionStart = terminalInput.selectionEnd = 
+                                startPos + completion.length;
+                            
+                            // Update the display
+                            updateTerminalDisplay();
+                        } else {
+                            // Multiple matches - show options
+                            terminalContent += '\n' + result.completions.join('    ') + '\n' + currentPrompt + savedInput;
+                            updateTerminalDisplay();
+                            
+                            // Restore cursor position
+                            terminalInput.selectionStart = terminalInput.selectionEnd = savedCursorPos;
+                        }
+                    }
+                });
+            }
+        }
+    });
+    
+    // Clear terminal button
+    document.getElementById('clear-terminal').addEventListener('click', function() {
+        terminalContent = '';
+        commandHistory = [];
+        historyPosition = -1;
+        
+        // Disconnect and reconnect to the socket
+        if (socket) {
+            socket.disconnect();
+        }
+        
+        // Reset the terminal
+        updateTerminalDisplay();
+        
+        // Set up a new connection
+        setupWebSocket();
+    });
+    
+    // Download terminal output
+    document.getElementById('download-output').addEventListener('click', function() {
+        // Create a blob with the terminal content
+        const blob = new Blob([terminalContent], { type: 'text/plain' });
+        
+        // Create a URL for the blob
+        const url = URL.createObjectURL(blob);
+        
+        // Create a link element
+        const a = document.createElement('a');
+        
+        // Get current date and time for filename
+        const date = new Date();
+        const timestamp = date.toISOString().replace(/[:.]/g, '-').replace('T', '_').split('Z')[0];
+        
+        // Set download attribute and href
+        a.download = `console_output_${timestamp}.txt`;
+        a.href = url;
+        
+        // Append to body, click, and remove
+        document.body.appendChild(a);
+        a.click();
+        
+        // Clean up
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 100);
+    });
+    
+    // Initialize the terminal - wrapped in a function to prevent duplicate initialization
+    let initialized = false;
+    function initializeTerminal() {
+        if (initialized) return;
+        initialized = true;
+        
+        setupWebSocket();
+        
+        // Make the entire terminal area clickable to focus input
+        terminal.addEventListener('mousedown', function(e) {
+            // Prevent default to avoid text selection issues
+            if (e.target === terminal) {
+                e.preventDefault();
+            }
+            
+            // Focus the input field when clicking anywhere in the terminal
+            terminalInput.focus();
+            
+            // Add visual indication that terminal is focused
+            terminal.classList.add('focused');
+        });
+        
+        // Handle focus and blur events for visual feedback
+        terminalInput.addEventListener('focus', function() {
+            terminal.classList.add('focused');
+            
+            // Remove focus message if it exists
+            const focusMsg = terminal.querySelector('.focus-message');
+            if (focusMsg) {
+                focusMsg.remove();
+            }
+        });
+        
+        terminalInput.addEventListener('blur', function() {
+            terminal.classList.remove('focused');
+            
+            // Add a more prominent message when terminal loses focus
+            // Remove existing message if it exists
+            const existingMsg = terminal.querySelector('.focus-message');
+            if (existingMsg) {
+                existingMsg.remove();
+            }
+            
+            // Create new focus message
+            const focusMsg = document.createElement('div');
+            focusMsg.className = 'focus-message';
+            focusMsg.textContent = 'Click to resume terminal session';
+            terminal.appendChild(focusMsg);
+        });
+        
+        // Add CSS to the head for terminal focus styling
+        const style = document.createElement('style');
+        style.textContent = `
+            .terminal.focused {
+                border-color: #3498db;
+            }
+            
+            .terminal {
+                cursor: text;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    // Only initialize once when page loads
+    window.addEventListener('load', initializeTerminal);
+    
+    // VNC functionality
+    const startVncBtn = document.getElementById('start-vnc');
+    const stopVncBtn = document.getElementById('stop-vnc');
+    const vncStatus = document.getElementById('vnc-status').querySelector('.badge');
+    const vncViewerContainer = document.getElementById('vnc-viewer-container');
+    const vncIframe = document.getElementById('vnc-iframe');
+    const vncHost = document.getElementById('vnc-host');
+    
+    startVncBtn.addEventListener('click', function() {
+        startVncBtn.disabled = true;
+        startVncBtn.textContent = 'Starting...';
+        
+        fetch('/start_vnc', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                vncStatus.textContent = 'Running';
+                vncStatus.classList.remove('error');
+                vncStatus.classList.add('success');
+                startVncBtn.style.display = 'none';
+                stopVncBtn.style.display = 'inline-block';
+                vncViewerContainer.style.display = 'block';
+                vncHost.textContent = 'localhost';
+                
+                // Use our simple VNC viewer
+                console.log('Loading simple VNC viewer');
+                vncIframe.src = '/static/js/simple-vnc-viewer.html';
+            } else {
+                alert('Error: ' + data.message);
+                startVncBtn.textContent = 'Start VNC Server';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to start VNC server');
+            startVncBtn.textContent = 'Start VNC Server';
+        })
+        .finally(() => {
+            startVncBtn.disabled = false;
+        });
+    });
+    
+    stopVncBtn.addEventListener('click', function() {
+        stopVncBtn.disabled = true;
+        stopVncBtn.textContent = 'Stopping...';
+        
+        fetch('/stop_vnc', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                vncStatus.textContent = 'Not Running';
+                vncStatus.classList.remove('success');
+                vncStatus.classList.add('error');
+                startVncBtn.style.display = 'inline-block';
+                stopVncBtn.style.display = 'none';
+                vncViewerContainer.style.display = 'none';
+                vncIframe.src = '';
+            } else {
+                alert('Error: ' + data.message);
+                stopVncBtn.textContent = 'Stop VNC Server';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to stop VNC server');
+            stopVncBtn.textContent = 'Stop VNC Server';
+        })
+        .finally(() => {
+            stopVncBtn.disabled = false;
+        });
+    });
+
+    /* Add these functions to handle terminal settings */
+    // Toggle settings panel
+    document.getElementById('settings-toggle').addEventListener('click', function() {
+        const settingsPanel = document.getElementById('terminal-settings');
+        if (settingsPanel.style.display === 'none') {
+            settingsPanel.style.display = 'block';
+        } else {
+            settingsPanel.style.display = 'none';
+        }
+    });
+    
+    // Load saved settings
+    function loadTerminalSettings() {
+        // Default settings
+        let settings = {
+            fontSize: '14px',
+            colorScheme: 'green',
+            cursorStyle: 'block',
+            cursorBlink: 'true'
+        };
+        
+        // Try to load from localStorage
+        try {
+            const savedSettings = localStorage.getItem('terminalSettings');
+            if (savedSettings) {
+                settings = JSON.parse(savedSettings);
+                
+                // Apply saved values to the form
+                document.getElementById('terminal-font-size').value = settings.fontSize;
+                document.getElementById('terminal-color-scheme').value = settings.colorScheme;
+                document.getElementById('terminal-cursor-style').value = settings.cursorStyle;
+                document.getElementById('terminal-cursor-blink').value = settings.cursorBlink;
+            }
+        } catch (e) {
+            console.error('Error loading terminal settings:', e);
+        }
+        
+        // Apply settings
+        applyTerminalSettings(settings);
+    }
+    
+    // Apply terminal settings
+    function applyTerminalSettings(settings) {
+        // Apply font size
+        terminal.style.fontSize = settings.fontSize;
+        
+        // Apply color scheme
+        let textColor, bgColor, glowColor;
+        switch(settings.colorScheme) {
+            case 'amber':
+                textColor = '#FFBF00';
+                bgColor = '#121212';
+                glowColor = 'rgba(255, 191, 0, 0.07)';
+                break;
+            case 'white':
+                textColor = '#F0F0F0';
+                bgColor = '#121212';
+                glowColor = 'rgba(240, 240, 240, 0.07)';
+                break;
+            case 'blue':
+                textColor = '#4F9BFF';
+                bgColor = '#0C0C1A';
+                glowColor = 'rgba(79, 155, 255, 0.07)';
+                break;
+            default: // green
+                textColor = '#2ECC40';
+                bgColor = '#121212';
+                glowColor = 'rgba(46, 204, 64, 0.07)';
+        }
+        
+        terminal.style.color = textColor;
+        terminal.style.backgroundColor = bgColor;
+        
+        // Update glow effect
+        const glow = terminal.querySelector('.terminal-glow');
+        if (glow) {
+            glow.style.background = `radial-gradient(ellipse at center, ${glowColor} 0%, rgba(0, 0, 0, 0.2) 100%)`;
+        }
+        
+        // Update cursor style
+        const cursorCSS = `
+            .terminal-cursor {
+                width: ${settings.cursorStyle === 'bar' ? '2px' : '8px'};
+                height: ${settings.cursorStyle === 'underline' ? '2px' : '16px'};
+                background-color: ${textColor};
+                animation: ${settings.cursorBlink === 'true' ? 'blink 1s step-end infinite' : 'none'};
+                ${settings.cursorStyle === 'underline' ? 'margin-top: 14px;' : ''}
+            }
+        `;
+        
+        // Look for existing cursor style element or create new one
+        let cursorStyle = document.getElementById('cursor-style');
+        if (!cursorStyle) {
+            cursorStyle = document.createElement('style');
+            cursorStyle.id = 'cursor-style';
+            document.head.appendChild(cursorStyle);
+        }
+        
+        cursorStyle.textContent = cursorCSS;
+        
+        // Save settings to localStorage
+        localStorage.setItem('terminalSettings', JSON.stringify(settings));
+    }
+    
+    // Handle settings changes
+    document.querySelectorAll('.terminal-setting').forEach(element => {
+        element.addEventListener('change', function() {
+            const settings = {
+                fontSize: document.getElementById('terminal-font-size').value,
+                colorScheme: document.getElementById('terminal-color-scheme').value,
+                cursorStyle: document.getElementById('terminal-cursor-style').value,
+                cursorBlink: document.getElementById('terminal-cursor-blink').value
+            };
+            
+            applyTerminalSettings(settings);
+            
+            // Focus back on the terminal after changing settings
+            setTimeout(() => {
+                terminalInput.focus();
+            }, 0);
+        });
+    });
+    
+    // Initialize settings on page load
+    window.addEventListener('load', function() {
+        loadTerminalSettings();
+    });
+</script>
+{% endblock %} 

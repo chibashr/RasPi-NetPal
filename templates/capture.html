@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Network Capture{% endblock %}
+
+{% block nav_capture %}active{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Packet Capture</h2>
+    
+    <div id="capture-grid" class="module-grid single-column">
+        <!-- Capture Settings Card -->
+        <div id="capture-options" class="module-card">
+            <div class="module-card-header">
+                <h3>Capture Settings</h3>
+            </div>
+            <div class="module-card-body">
+                <div class="capture-controls">
+                    <div class="form-field">
+                        <label for="interface">Interface:</label>
+                        <select id="interface" name="interface">
+                            {% for iface in interfaces %}
+                            <option value="{{ iface.name }}">{{ iface.name }} - {{ iface.addr }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    
+                    <div class="form-field">
+                        <label for="filter">Capture Filter:</label>
+                        <input type="text" id="filter" name="filter" placeholder="e.g. port 80">
+                        <small class="form-help">Uses tcpdump/pcap filter syntax</small>
+                    </div>
+                    
+                    <div class="form-field capture-options-grid">
+                        <div>
+                            <label for="limit">Max Packets:</label>
+                            <input type="number" id="limit" name="limit" min="1" max="10000" value="1000">
+                        </div>
+                        <div>
+                            <label for="duration">Max Duration (s):</label>
+                            <input type="number" id="duration" name="duration" min="1" max="3600" value="60">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="capture-mode-and-buttons">
+                    <div class="capture-mode">
+                        <label>Capture Mode:</label>
+                        <div class="radio-group-horizontal">
+                            <label class="radio-label">
+                                <input type="radio" name="promiscuous" value="true" checked> 
+                                Promiscuous
+                            </label>
+                            <label class="radio-label">
+                                <input type="radio" name="promiscuous" value="false"> 
+                                Normal
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="module-card-footer">
+                <div class="capture-buttons">
+                    <button id="start-capture-btn" class="button button-primary">Start Capture</button>
+                    <button id="stop-capture-btn" class="button button-danger">Stop Capture</button>
+                    <button id="download-capture-btn" class="button button-info">Download PCAP</button>
+                    <button id="clear-output-btn" class="button button-secondary">Clear Output</button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Packet Output Card -->
+        <div id="capture-output-card" class="module-card">
+            <div class="module-card-header">
+                <h3>Packet Output</h3>
+            </div>
+            <div class="module-card-body capture-output-container">
+                <div id="capture-output" class="capture-output">
+                    <div class="no-data">Start a capture to see packets</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <h2>Capture History</h2>
+    <div class="capture-history-container">
+        <table class="capture-history-table">
+            <thead>
+                <tr>
+                    <th>NAME</th>
+                    <th>INTERFACE</th>
+                    <th>FILTER</th>
+                    <th>MODE</th>
+                    <th>PACKETS</th>
+                    <th>SIZE</th>
+                    <th>START TIME</th>
+                    <th>END TIME</th>
+                    <th>ACTIONS</th>
+                </tr>
+            </thead>
+            <tbody id="capture-history-body">
+                {% if capture_history %}
+                    {% for capture in capture_history %}
+                    <tr data-id="{{ capture.id }}">
+                        <td class="capture-name">{{ capture.name }}</td>
+                        <td>{{ capture.interface }}</td>
+                        <td>{{ capture.filter or "None" }}</td>
+                        <td>{{ "Promiscuous" if capture.promiscuous else "Normal" }}</td>
+                        <td>{{ capture.packet_count }}</td>
+                        <td>{{ (capture.file_size / 1024)|round|int if capture.file_size else 0 }} KB</td>
+                        <td>{{ capture.start_time }}</td>
+                        <td>{{ capture.end_time or "Running..." }}</td>
+                        <td class="actions">
+                            <button class="button button-sm button-info" onclick="downloadCapture('{{ capture.id }}')">Download</button>
+                            <button class="button button-sm button-secondary" onclick="renameCapture('{{ capture.id }}')">Rename</button>
+                            <button class="button button-sm button-danger" onclick="deleteCapture('{{ capture.id }}')">Delete</button>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                    <tr>
+                        <td colspan="9" class="text-center">No captures yet</td>
+                    </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<!-- Rename Modal -->
+<div id="rename-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Rename Capture</h3>
+            <span class="close" onclick="closeRenameModal()">&times;</span>
+        </div>
+        <div class="modal-body">
+            <form id="rename-form">
+                <input type="hidden" id="rename-capture-id">
+                <div class="form-field">
+                    <label for="new-capture-name">New Name:</label>
+                    <input type="text" id="new-capture-name" name="new-capture-name" required>
+                </div>
+                <div class="form-actions">
+                    <button type="button" class="button button-secondary" onclick="closeRenameModal()">Cancel</button>
+                    <button type="submit" class="button button-primary">Save</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/capture.js') }}"></script>
+{% endblock %} 

@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VNC Connection</title>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            margin: 0;
+            padding: 0;
+            background: #222;
+            color: #eee;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        
+        .header {
+            background: #333;
+            padding: 10px;
+            text-align: center;
+            border-bottom: 1px solid #444;
+        }
+        
+        .connection-options {
+            padding: 10px;
+            background: #2a2a2a;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        button {
+            background: #444;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        
+        button:hover {
+            background: #555;
+        }
+        
+        .active {
+            background: #3465a4;
+        }
+        
+        .viewer-container {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        
+        .message {
+            padding: 10px;
+            background: rgba(0,0,0,0.7);
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            right: 20px;
+            border-radius: 5px;
+            text-align: center;
+        }
+
+        .ip-form {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .ip-form input {
+            background: #444;
+            color: white;
+            border: 1px solid #555;
+            padding: 7px;
+            border-radius: 4px;
+            width: 150px;
+        }
+
+        .ip-form button {
+            padding: 7px 15px;
+        }
+
+        .connection-info {
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        .connection-info table {
+            margin: 0 auto;
+            border-collapse: collapse;
+        }
+
+        .connection-info td {
+            padding: 5px 10px;
+            text-align: left;
+            border-bottom: 1px solid #444;
+        }
+
+        .connection-info td:first-child {
+            font-weight: bold;
+            text-align: right;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>VNC Viewer</h2>
+    </div>
+    
+    <div class="connection-options">
+        <button id="option1" class="active" onclick="loadVNC('novnc-lite')">NoVNC Lite (Default)</button>
+        <button id="option2" onclick="loadVNC('novnc-full')">NoVNC Full Client</button>
+        <button id="option3" onclick="loadVNC('novnc-localhost')">Localhost Connection</button>
+        <button id="option4" onclick="loadVNC('novnc-ip')">IP Address</button>
+        <button id="option5" onclick="loadVNC('native-client')">Native VNC Client</button>
+        <div id="ip-form" class="ip-form" style="display: none;">
+            <input type="text" id="custom-ip" placeholder="Enter IP Address" value="192.168.4.1">
+            <button onclick="connectToCustomIP()">Connect</button>
+        </div>
+    </div>
+    
+    <div class="viewer-container">
+        <div id="message" class="message">Connecting to VNC server...</div>
+    </div>
+    
+    <script>
+        const viewerContainer = document.querySelector('.viewer-container');
+        let messageEl = document.getElementById('message');
+        const ipFormEl = document.getElementById('ip-form');
+        
+        function setActiveButton(id) {
+            document.querySelectorAll('.connection-options button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            document.getElementById(id).classList.add('active');
+        }
+        
+        function connectToCustomIP() {
+            const ipAddress = document.getElementById('custom-ip').value.trim();
+            if (ipAddress) {
+                const iframe = document.createElement('iframe');
+                iframe.src = `/static/novnc/vnc_lite.html?host=${ipAddress}&port=6080&path=&autoconnect=true&resize=scale`;
+                
+                // Clear and update container
+                viewerContainer.innerHTML = '<div id="message" class="message">Connecting to custom IP...</div>';
+                messageEl = document.getElementById('message');
+                viewerContainer.appendChild(iframe);
+                
+                messageEl.textContent = `Connecting to ${ipAddress}:6080 using NoVNC Lite...`;
+                
+                // Hide message after a delay
+                setTimeout(() => {
+                    if (messageEl) {
+                        messageEl.style.opacity = '0';
+                        messageEl.style.transition = 'opacity 1s';
+                    }
+                }, 5000);
+            }
+        }
+        
+        function loadVNC(type) {
+            // Control IP form visibility
+            ipFormEl.style.display = (type === 'novnc-ip') ? 'flex' : 'none';
+            
+            // Only clear viewer if not choosing custom IP (which has its own handler)
+            if (type !== 'novnc-ip') {
+                // Clear current viewer
+                viewerContainer.innerHTML = '<div id="message" class="message">Connecting to VNC server...</div>';
+                messageEl = document.getElementById('message');
+            } else {
+                // Just return for IP option as we'll handle it separately
+                return;
+            }
+            
+            // Set active button
+            const buttonMap = {
+                'novnc-lite': 'option1',
+                'novnc-full': 'option2',
+                'novnc-localhost': 'option3',
+                'novnc-ip': 'option4',
+                'native-client': 'option5'
+            };
+            setActiveButton(buttonMap[type]);
+            
+            // Get current hostname and create iframe
+            const hostname = window.location.hostname;
+            const iframe = document.createElement('iframe');
+            
+            // For native client option, don't create iframe
+            if (type !== 'native-client') {
+                viewerContainer.appendChild(iframe);
+            }
+            
+            // Set up connection based on type
+            switch (type) {
+                case 'novnc-lite':
+                    // Use current hostname for WebSocket connection
+                    iframe.src = `/static/novnc/vnc_lite.html?host=${hostname}&port=6080&path=&autoconnect=true&resize=scale`;
+                    messageEl.textContent = `Connecting to ${hostname}:6080 using NoVNC Lite...`;
+                    break;
+                    
+                case 'novnc-full':
+                    iframe.src = `/static/novnc/vnc.html?host=${hostname}&port=6080&path=&autoconnect=true&resize=scale`;
+                    messageEl.textContent = `Connecting to ${hostname}:6080 using NoVNC Full Client...`;
+                    break;
+                    
+                case 'novnc-localhost':
+                    iframe.src = `/static/novnc/vnc_lite.html?host=localhost&port=6080&path=&autoconnect=true&resize=scale`;
+                    messageEl.textContent = 'Connecting to localhost:6080 using NoVNC Lite...';
+                    break;
+                    
+                case 'native-client':
+                    // Display connection info for native VNC clients
+                    const ipAddresses = [hostname, 'localhost'];
+                    if (hostname !== '192.168.4.1') {
+                        ipAddresses.push('192.168.4.1');
+                    }
+                    
+                    // Create connection table
+                    let connectionHTML = `
+                        <div class="connection-info">
+                            <h3>Native VNC Client Connection Options</h3>
+                            <p>Use any of these connection details with your preferred VNC client:</p>
+                            <table>
+                    `;
+                    
+                    // Add direct VNC port options
+                    ipAddresses.forEach(ip => {
+                        connectionHTML += `
+                            <tr>
+                                <td>Direct VNC:</td>
+                                <td>${ip}:5900</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    // Add websockify options
+                    ipAddresses.forEach(ip => {
+                        connectionHTML += `
+                            <tr>
+                                <td>WebSocket:</td>
+                                <td>${ip}:6080</td>
+                            </tr>
+                        `;
+                    });
+                    
+                    connectionHTML += `
+                            </table>
+                            <p style="margin-top: 15px">Note: If one IP doesn't work, try the others</p>
+                        </div>
+                    `;
+                    
+                    messageEl.innerHTML = connectionHTML;
+                    messageEl.style.top = '20px';
+                    messageEl.style.bottom = '20px';
+                    messageEl.style.overflow = 'auto';
+                    break;
+            }
+            
+            // Hide message after a delay for connections (not for native client info)
+            if (type !== 'native-client') {
+                setTimeout(() => {
+                    if (messageEl) {
+                        messageEl.style.opacity = '0';
+                        messageEl.style.transition = 'opacity 1s';
+                    }
+                }, 5000);
+            }
+        }
+        
+        // Initialize with default option
+        loadVNC('novnc-lite');
+    </script>
+</body>
+</html> 

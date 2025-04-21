@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct VNC Connection</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            width: 100%;
+            background-color: #222;
+            color: #eee;
+            font-family: Arial, sans-serif;
+        }
+        
+        #screen {
+            position: absolute;
+            top: 50px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            margin: 0;
+            background-color: #333;
+        }
+        
+        #top_bar {
+            background-color: #444;
+            height: 50px;
+            padding: 0 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        #status {
+            font-weight: bold;
+        }
+        
+        #sendCtrlAltDelButton {
+            background-color: #555;
+            border: none;
+            color: white;
+            padding: 5px 10px;
+            cursor: pointer;
+            border-radius: 3px;
+        }
+        
+        #sendCtrlAltDelButton:hover {
+            background-color: #666;
+        }
+    </style>
+    <!-- Core dependencies -->
+    <script src="/static/novnc/core/util/eventtarget.js"></script>
+    <script src="/static/novnc/core/util/logging.js"></script>
+    <script src="/static/novnc/core/util/browser.js"></script>
+    <script src="/static/novnc/core/util/events.js"></script>
+    <script src="/static/novnc/core/util/strings.js"></script>
+    <script src="/static/novnc/core/util/int.js"></script>
+    <script src="/static/novnc/core/util/element.js"></script>
+    <script src="/static/novnc/core/util/cursor.js"></script>
+    <script src="/static/novnc/core/display.js"></script>
+    <script src="/static/novnc/core/input/util.js"></script>
+    <script src="/static/novnc/core/input/devices.js"></script>
+    <script src="/static/novnc/core/input/keysymdef.js"></script>
+    <script src="/static/novnc/core/input/keysym.js"></script>
+    <script src="/static/novnc/core/input/keyboard.js"></script>
+    <script src="/static/novnc/core/input/mouse.js"></script>
+    <script src="/static/novnc/core/input/gesturehandler.js"></script>
+    <script src="/static/novnc/core/websock.js"></script>
+    <script src="/static/novnc/core/des.js"></script>
+    <script src="/static/novnc/core/rfb.js"></script>
+</head>
+<body>
+    <div id="top_bar">
+        <div id="status">Connecting...</div>
+        <button id="sendCtrlAltDelButton">Send Ctrl+Alt+Del</button>
+    </div>
+    <div id="screen"></div>
+
+    <script>
+        // Simple VNC client that directly connects to localhost:6080
+        let rfb;
+        const statusEl = document.getElementById('status');
+        
+        function connected() {
+            statusEl.innerHTML = "Connected";
+        }
+        
+        function disconnected(e) {
+            if (e.detail && e.detail.clean) {
+                statusEl.innerHTML = "Disconnected";
+            } else {
+                const reason = e.detail ? e.detail.reason : "Unknown reason";
+                statusEl.innerHTML = "Connection failed: " + reason;
+            }
+        }
+        
+        function credentialsRequired(e) {
+            const password = prompt("Password Required:");
+            rfb.sendCredentials({ password: password });
+        }
+
+        function sendCtrlAltDel() {
+            if (rfb) rfb.sendCtrlAltDel();
+        }
+        
+        document.getElementById('sendCtrlAltDelButton').onclick = sendCtrlAltDel;
+        
+        // Connect when page loads
+        window.addEventListener('load', function() {
+            // Connect directly to the websockify server
+            const url = 'ws://localhost:6080';
+            
+            try {
+                console.log("Connecting to VNC server at: " + url);
+                // Initialize RFB connection
+                rfb = new RFB(document.getElementById('screen'), url, {
+                    shared: true,
+                    credentials: { password: '' }
+                });
+                
+                // Add event listeners
+                rfb.addEventListener('connect', connected);
+                rfb.addEventListener('disconnect', disconnected);
+                rfb.addEventListener('credentialsrequired', credentialsRequired);
+                
+                // Set view options
+                rfb.viewOnly = false;
+                rfb.scaleViewport = true;
+            } catch (err) {
+                console.error("Error initializing VNC client:", err);
+                statusEl.innerHTML = "Error: " + err.message;
+            }
+        });
+    </script>
+</body>
+</html> 

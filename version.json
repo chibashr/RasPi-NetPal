@@ -1,0 +1,64 @@
+{
+  "version": "1.0.5",
+  "name": "Raspberry Pi Network Control Panel",
+  "developer": "Michael Du Mez",
+  "release_date": "2025-04-16",
+  "changelog": [
+    {
+      "version": "1.0.5",
+      "date": "2025-04-21",
+      "changes": [
+        "Added internet connectivity detection for network interfaces",
+        "Network interfaces with internet access are now marked in the UI"
+      ]
+    },
+    {
+      "version": "1.0.4",
+      "date": "2025-04-20",
+      "changes": [
+        "Added USB serial device detection and support",
+        "Improved USB device discovery functionality"
+      ]
+    },
+    {
+      "version": "1.0.3",
+      "date": "2025-04-19",
+      "changes": [
+        "Added USB network interface detection and support",
+        "Improved connection sharing with USB tethered devices"
+      ]
+    },
+    {
+      "version": "1.0.2",
+      "date": "2025-04-18",
+      "changes": [
+        "Fixed terminal cursor positioning",
+        "Improved tab completion for files and filepaths"
+      ]
+    },
+    {
+      "version": "1.0.1",
+      "date": "2025-04-17",
+      "changes": [
+        "Added network scanning functionality",
+        "Added ability to save and manage scan results",
+        "Added configurable scan settings"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2025-04-16",
+      "changes": [
+        "Initial release",
+        "Added network interface management",
+        "Added packet capture functionality",
+        "Added system service control",
+        "Added TFTP file transfer",
+        "Added web-based terminal console",
+        "Added hardware monitoring",
+        "Added connection sharing",
+        "Added documentation system"
+      ]
+    }
+  ]
+} 

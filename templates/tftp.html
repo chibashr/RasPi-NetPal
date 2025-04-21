@@ -1,0 +1,567 @@
+{% extends "base.html" %}
+
+{% block title %}File Transfer{% endblock %}
+
+{% block nav_tftp %}active{% endblock %}
+
+{% block extra_css %}
+    <style>
+        /* Split layout - left column for controls, right column for file browser */
+        .tftp-grid-layout {
+            display: grid;
+            grid-template-columns: 1fr 1fr; /* Two equal columns */
+            gap: 20px;
+        }
+        
+        /* Make file browser take full height */
+        .file-browser-container {
+            grid-column: 2;
+            grid-row: 1 / span 3;
+        }
+        
+        /* Loading spinner */
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary-color);
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+        
+        .dark-mode .spinner {
+            border-color: rgba(255, 255, 255, 0.1);
+            border-top-color: var(--primary-color);
+        }
+        
+        /* Drag and drop zone */
+        .drag-drop-zone {
+            border: 2px dashed var(--border-color);
+            border-radius: 8px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: rgba(0, 0, 0, 0.01);
+        }
+        
+        .drag-drop-zone:hover, .drag-drop-zone.dragover {
+            background-color: rgba(0, 0, 0, 0.03);
+            transform: scale(1.01);
+            border-color: var(--primary-color);
+        }
+        
+        .dark-mode .drag-drop-zone:hover, .dark-mode .drag-drop-zone.dragover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: var(--primary-color);
+        }
+        
+        .upload-icon {
+            font-size: 42px;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+        }
+        
+        /* File browser navigation */
+        .file-browser-nav {
+            margin-bottom: 15px;
+        }
+        
+        .current-path-container {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 10px;
+            background-color: rgba(0, 0, 0, 0.02);
+            border-radius: 4px;
+        }
+        
+        .current-path {
+            font-weight: 500;
+            color: var(--primary-color);
+        }
+        
+        /* Modern table */
+        .modern-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        
+        .modern-table thead th {
+            background-color: #f5f5f7;
+            padding: 12px 15px;
+            font-weight: 600;
+            text-align: left;
+            border-bottom: 1px solid #e0e0e0;
+        }
+        
+        .modern-table tbody tr {
+            transition: background-color 0.2s;
+        }
+        
+        .modern-table tbody tr:hover {
+            background-color: rgba(0,0,0,0.02);
+        }
+        
+        .modern-table td {
+            padding: 12px 15px;
+            border-bottom: 1px solid #f0f0f0;
+        }
+        
+        .modern-table tr:last-child td {
+            border-bottom: none;
+        }
+        
+        /* Dark mode styles */
+        .dark-mode .server-info-box {
+            background-color: #2d2d2d;
+            border-left: 4px solid var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .dark-mode .info-value {
+            color: #ddd;
+        }
+        
+        .dark-mode .current-path-container {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+        
+        .dark-mode .modern-table thead th {
+            background-color: #333;
+            border-bottom: 1px solid #444;
+        }
+        
+        .dark-mode .modern-table tbody tr:hover {
+            background-color: rgba(255,255,255,0.03);
+        }
+        
+        .dark-mode .modern-table td {
+            border-bottom: 1px solid #333;
+        }
+        
+        /* File upload progress */
+        .upload-progress {
+            margin: 10px 0 20px;
+            background-color: #f0f0f0;
+            border-radius: 8px;
+            overflow: hidden;
+            display: none;
+        }
+    
+    .upload-progress-item {
+        margin-bottom: 8px;
+        border-bottom: 1px solid #eaeaea;
+        padding-bottom: 8px;
+    }
+    
+    .upload-progress-item:last-child {
+        margin-bottom: 0;
+        border-bottom: none;
+        padding-bottom: 0;
+        }
+        
+        .upload-progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 15px;
+            font-size: 14px;
+            background-color: rgba(0,0,0,0.03);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+        }
+        
+        .upload-file-name {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60%;
+            font-weight: 500;
+        }
+        
+        .upload-speed {
+            font-weight: 500;
+            color: var(--primary-color);
+            margin-left: 15px;
+            padding-left: 15px;
+            border-left: 1px solid rgba(0,0,0,0.1);
+        }
+        
+        .upload-percentage {
+            font-weight: 600;
+            min-width: 45px;
+            text-align: right;
+        }
+        
+        .dark-mode .upload-speed {
+            color: var(--primary-color-light, #6bb9ff);
+            border-left: 1px solid rgba(255,255,255,0.1);
+        }
+        
+        .upload-progress-bar {
+            height: 6px;
+            background-color: var(--primary-color);
+            width: 0%;
+            transition: width 0.3s;
+        }
+        
+        .dark-mode .upload-progress {
+            background-color: #2a2a2a;
+        }
+        
+        .dark-mode .upload-progress-info {
+            background-color: rgba(255,255,255,0.05);
+        }
+    
+    .dark-mode .upload-progress-item {
+        border-color: #333;
+        }
+        
+        /* Icons */
+        [class^="icon-"] {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+        vertical-align: middle;
+        margin-right: 5px;
+        }
+        
+        .icon-folder::before {
+            content: "📁";
+        }
+        
+        .icon-folder-open::before {
+            content: "📂";
+        }
+        
+        .icon-folder-plus::before {
+            content: "📁+";
+        }
+        
+        .icon-file::before {
+            content: "📄";
+        }
+        
+        .icon-upload::before {
+            content: "⬆️";
+        }
+        
+        .icon-arrow-up::before {
+            content: "↑";
+        }
+        
+        .icon-network::before {
+            content: "🌐";
+        }
+        
+        .icon-port::before {
+            content: "🔌";
+        }
+        
+        .icon-info::before {
+            content: "ℹ️";
+        }
+        
+        .icon-download::before {
+            content: "⬇️";
+        }
+        
+        .icon-trash::before {
+            content: "🗑️";
+        }
+        
+        /* Server info box */
+        .server-info-box {
+            margin: 15px 0;
+            padding: 15px;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            border-left: 4px solid var(--primary-color);
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        
+        .server-info-box h4 {
+            margin-top: 0;
+            margin-bottom: 15px;
+            color: var(--primary-color);
+            font-size: 16px;
+        }
+        
+        .server-info-grid {
+            display: grid;
+            gap: 10px;
+        }
+        
+        .info-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            line-height: 1.5;
+        }
+        
+        .info-label {
+            font-weight: 600;
+            min-width: 100px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .info-value {
+            color: #333;
+        }
+        
+        /* Server credentials box */
+        .server-credentials-box {
+            margin: 10px 0 15px;
+            padding: 12px 15px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .server-credentials-box h4 {
+            margin-top: 0;
+            margin-bottom: 12px;
+            color: var(--primary-color);
+            font-size: 16px;
+        }
+        
+        .credentials-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .form-field.compact {
+            margin-bottom: 0;
+        }
+        
+        .form-field.compact label {
+            margin-bottom: 4px;
+            display: block;
+            font-size: 14px;
+        }
+        
+        .server-info-line {
+            margin: 6px 0 0;
+            font-size: 14px;
+            color: #555;
+        }
+        
+        /* Input with button */
+        .input-with-button {
+            display: flex;
+            gap: 5px;
+        }
+        
+        .input-with-button input {
+            flex: 1;
+        }
+        
+        /* Highlight effect for password field */
+        .highlight {
+            animation: highlight-pulse 0.5s ease;
+        }
+        
+        @keyframes highlight-pulse {
+            0% { background-color: transparent; }
+            50% { background-color: #ffeeba; }
+            100% { background-color: transparent; }
+        }
+        
+        .dark-mode .highlight {
+            animation: highlight-pulse-dark 0.5s ease;
+        }
+        
+        @keyframes highlight-pulse-dark {
+            0% { background-color: transparent; }
+            50% { background-color: #4d442b; }
+            100% { background-color: transparent; }
+        }
+        
+        .dark-mode .server-info-box {
+            background-color: #2d2d2d;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .dark-mode .server-credentials-box {
+            background-color: #2d2d2d;
+            border-left: 4px solid var(--primary-color);
+        }
+        
+        .dark-mode .server-info-line {
+            color: #ddd;
+        }
+        
+        /* Responsive adjustments */
+        @media (max-width: 992px) {
+            .tftp-grid-layout {
+                grid-template-columns: 1fr;
+            }
+            
+            .file-browser-container {
+                grid-column: 1;
+                grid-row: auto;
+            }
+        }
+        
+        /* Responsive adjustments for credentials grid */
+        @media (max-width: 768px) {
+            .credentials-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .text-center {
+            text-align: center;
+        }
+    </style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>File Transfer & TFTP Service</h2>
+    
+    <div id="tftp-grid" class="module-grid">
+        <div id="tftp-service" class="module-card">
+            <div class="module-card-header">
+                <h3>TFTP Server Status</h3>
+            </div>
+            <div class="module-card-body">
+                <div class="server-status">
+                    <div>
+                        <span>Status: </span>
+                        <span id="tftp-status" class="badge badge-danger">Inactive</span>
+                    </div>
+                    <div>
+                        <button id="start-tftp" class="button button-primary">Start Server</button>
+                        <button id="stop-tftp" class="button button-danger" disabled>Stop Server</button>
+                    </div>
+                </div>
+                
+                <div id="server-config" class="form-field" style="margin-top: 15px;">
+                    <label for="tftp-dir">TFTP Root Directory:</label>
+                    <div class="flex-row">
+                        <input type="text" id="tftp-dir" name="tftp-dir" value="/opt/captive/transfers" readonly>
+                        <button id="browse-tftp-dir" class="button">Browse</button>
+                    </div>
+                </div>
+                
+                <div id="tftp-info" class="status-bar info" style="display: none; margin-top: 15px;">
+                    Server started. Use the following commands to connect:
+                    <pre>tftp {{ ip_address }} 69
+put local_file.txt
+get remote_file.txt</pre>
+                </div>
+            </div>
+        </div>
+
+        <div id="file-upload" class="module-card">
+            <div class="module-card-header">
+                <h3>File Upload</h3>
+            </div>
+            <div class="module-card-body">
+                <div class="drag-drop-zone" id="drop-area">
+                    <div class="upload-icon">⇧</div>
+                    <p>Drag & drop files here or click to browse</p>
+                    <small>Files will be uploaded to the current directory</small>
+                    <input type="file" id="file-input" multiple style="display: none;">
+                </div>
+                
+                <div id="upload-progress" class="upload-progress" style="display: none;">
+                    <!-- Upload progress will be shown here -->
+                </div>
+            </div>
+        </div>
+        
+        <div id="file-browser" class="module-card file-browser-container">
+            <div class="module-card-header">
+                <h3>File Browser</h3>
+            </div>
+            <div class="module-card-body">
+                <div class="file-browser-nav">
+                    <div class="current-path-container">
+                        <span>Path:</span>
+                        <span class="current-path" id="current-path">/</span>
+                    </div>
+                    <div class="button-group" style="margin-top: 10px;">
+                        <button id="parent-dir" class="button button-sm button-secondary">Parent Directory</button>
+                        <button id="refresh-files" class="button button-sm button-secondary">Refresh</button>
+                        <button id="create-folder" class="button button-sm button-primary">New Folder</button>
+                    </div>
+                </div>
+                
+                <div class="file-listing">
+                    <table class="modern-table">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Type</th>
+                                <th>Size</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="file-list">
+                            <tr>
+                                <td colspan="4" class="text-center">Loading files...</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for creating a new folder -->
+<div id="new-folder-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>Create New Folder</h3>
+            <span class="close" id="close-folder-modal">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div class="form-field">
+                <label for="folder-name">Folder Name:</label>
+                <input type="text" id="folder-name" name="folder-name">
+            </div>
+            <div class="form-field" style="margin-top: 15px;">
+                <button id="create-folder-submit" class="button button-primary">Create</button>
+                <button id="cancel-folder" class="button button-secondary">Cancel</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for file details -->
+<div id="file-details-modal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3>File Details</h3>
+            <span class="close" id="close-file-details">&times;</span>
+        </div>
+        <div class="modal-body">
+            <div id="file-details-content">
+                <div class="loading-text">Loading file details...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/file-transfer.js') }}"></script>
+{% endblock %} 

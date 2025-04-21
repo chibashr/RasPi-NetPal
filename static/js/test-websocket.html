@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background: #222;
+            color: #eee;
+        }
+        #status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            background: #333;
+        }
+        .success {
+            background: #164016 !important;
+        }
+        .error {
+            background: #601616 !important;
+        }
+        button {
+            padding: 8px 16px;
+            background: #444;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        button:hover {
+            background: #555;
+        }
+    </style>
+</head>
+<body>
+    <h2>WebSocket Connection Tester</h2>
+    <div id="status">Ready to test connections</div>
+    
+    <div>
+        <button onclick="testConnection('ws://localhost:6080')">Test localhost:6080</button>
+        <button onclick="testConnection('ws://localhost:6080/websockify')">Test localhost:6080/websockify</button>
+        <button onclick="testConnection('ws://' + window.location.hostname + ':6080')">Test hostname:6080</button>
+        <button onclick="testConnection('ws://' + window.location.hostname + ':6080/websockify')">Test hostname:6080/websockify</button>
+    </div>
+    
+    <h3>Direct VNC</h3>
+    <div>
+        <button onclick="testVNC('localhost', '5900')">Test VNC localhost:5900</button>
+        <button onclick="testVNC(window.location.hostname, '5900')">Test VNC hostname:5900</button>
+    </div>
+    
+    <script>
+        const statusEl = document.getElementById('status');
+        
+        function testConnection(url) {
+            statusEl.textContent = 'Connecting to ' + url + '...';
+            statusEl.className = '';
+            
+            try {
+                const socket = new WebSocket(url);
+                
+                socket.onopen = function() {
+                    statusEl.textContent = 'SUCCESS: Connected to ' + url;
+                    statusEl.className = 'success';
+                    
+                    // Close after a short time
+                    setTimeout(() => {
+                        socket.close();
+                    }, 2000);
+                };
+                
+                socket.onerror = function(error) {
+                    statusEl.textContent = 'ERROR: Failed to connect to ' + url;
+                    statusEl.className = 'error';
+                    console.error('WebSocket error:', error);
+                };
+                
+                socket.onclose = function() {
+                    console.log('WebSocket closed');
+                };
+            } catch (error) {
+                statusEl.textContent = 'ERROR: ' + error.message;
+                statusEl.className = 'error';
+                console.error('Connection error:', error);
+            }
+        }
+        
+        function testVNC(host, port) {
+            const url = `http://${host}:${port}`;
+            statusEl.textContent = 'Testing direct VNC access to ' + url + '...';
+            
+            // Create an image to test connectivity
+            const img = document.createElement('img');
+            img.style.display = 'none';
+            img.onload = function() {
+                statusEl.textContent = 'SUCCESS: VNC port is responding on ' + url;
+                statusEl.className = 'success';
+            };
+            img.onerror = function() {
+                statusEl.textContent = 'ERROR: Cannot connect to VNC port at ' + url;
+                statusEl.className = 'error';
+            };
+            img.src = url;
+            document.body.appendChild(img);
+            
+            // Remove the image after testing
+            setTimeout(() => {
+                document.body.removeChild(img);
+            }, 3000);
+        }
+    </script>
+</body>
+</html> 

@@ -1,0 +1,582 @@
+{% extends "base.html" %}
+
+{% block title %}Network Tools{% endblock %}
+
+{% block nav_tools %}active{% endblock %}
+
+{% block extra_js %}
+<script src="{{ url_for('static', filename='js/lib/jquery-3.6.0.min.js') }}"></script>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    /* Custom tab styling */
+    .nav-tabs {
+        list-style-type: none !important;
+        padding-left: 0 !important;
+        display: flex;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 15px;
+    }
+    
+    .nav-item {
+        margin-bottom: -1px;
+        margin-right: 5px;
+        list-style-type: none !important;
+    }
+    
+    .nav-link {
+        padding: 10px 15px;
+        background: none;
+        border: none;
+        border-bottom: 3px solid transparent;
+        cursor: pointer;
+        color: #333;
+        text-decoration: none;
+        display: block;
+        transition: border-color 0.3s;
+    }
+    
+    .nav-link:hover {
+        border-bottom-color: #eee;
+        text-decoration: none;
+    }
+    
+    .nav-link.active {
+        color: #333;
+        border-bottom: 3px solid #28a745;
+        font-weight: bold;
+    }
+    
+    .tab-content {
+        margin-top: 20px;
+    }
+    
+    .tab-pane {
+        display: none;
+    }
+    
+    .tab-pane.active {
+        display: block;
+    }
+    
+    .dark-mode .nav-tabs {
+        border-bottom-color: #444;
+    }
+    
+    .dark-mode .nav-link {
+        color: #e0e0e0;
+    }
+    
+    .dark-mode .nav-link:hover {
+        border-bottom-color: #333;
+    }
+    
+    .dark-mode .nav-link.active {
+        color: #e0e0e0;
+        border-bottom-color: #28a745;
+    }
+    
+    /* Remove default styles that might interfere */
+    ul.nav-tabs li::before,
+    ul.nav-tabs li::marker {
+        content: none !important;
+        display: none !important;
+    }
+    
+    /* Results container styling */
+    .result-container {
+        border: 1px solid #ddd;
+        border-radius: 4px;
+        max-height: 400px;
+        overflow-y: auto;
+        background-color: #f8f9fa;
+        padding: 10px;
+    }
+    
+    .dark-mode .result-container {
+        background-color: #2a2a2a;
+        border-color: #444;
+        color: #e0e0e0;
+    }
+    
+    .tool-results {
+        font-family: monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+        margin: 0;
+        padding: 0;
+    }
+    
+    /* Checkbox styling for stream toggle */
+    .form-check {
+        display: flex;
+        align-items: center;
+        margin-bottom: 8px;
+    }
+    
+    .form-check-input {
+        margin-right: 8px;
+        width: 18px;
+        height: 18px;
+        cursor: pointer;
+    }
+    
+    .form-check-label {
+        margin-bottom: 0;
+        cursor: pointer;
+        user-select: none;
+        font-weight: 500;
+    }
+    
+    .dark-mode .form-check-input {
+        background-color: #333;
+        border-color: #555;
+    }
+    
+    .dark-mode .form-check-input:checked {
+        background-color: #28a745;
+        border-color: #28a745;
+    }
+    
+    /* Consistent button styling with style.css */
+    .btn-primary {
+        background-color: #28a745;
+        border-color: #28a745;
+    }
+    
+    .btn-primary:hover {
+        background-color: #218838;
+        border-color: #1e7e34;
+    }
+    
+    .btn-secondary {
+        background-color: #6c757d;
+        border-color: #6c757d;
+    }
+    
+    .btn-secondary:hover {
+        background-color: #5a6268;
+        border-color: #545b62;
+    }
+    
+    .btn-outline-secondary {
+        color: #6c757d;
+        border-color: #6c757d;
+    }
+    
+    .btn-outline-secondary:hover {
+        background-color: #6c757d;
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+    {% if not tools_installed %}
+    <div class="status-bar error" style="display: block;">
+        Unable to install required tools. Please check system logs or try manually installing the required packages.
+    </div>
+    {% endif %}
+
+    <div class="card">
+        <h2>Network Diagnostic Tools</h2>
+        
+        <ul class="nav-tabs" id="tools-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <a class="nav-link active" id="ping-tab" href="#ping" role="tab" aria-controls="ping" aria-selected="true">Ping</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" id="traceroute-tab" href="#traceroute" role="tab" aria-controls="traceroute" aria-selected="false">Traceroute</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" id="dns-tab" href="#dns" role="tab" aria-controls="dns" aria-selected="false">DNS Lookup</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" id="mtr-tab" href="#mtr" role="tab" aria-controls="mtr" aria-selected="false">MTR</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" id="iperf-tab" href="#iperf" role="tab" aria-controls="iperf" aria-selected="false">iPerf3</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" id="nmap-tab" href="#nmap" role="tab" aria-controls="nmap" aria-selected="false">Nmap</a>
+            </li>
+            <li class="nav-item" role="presentation">
+                <a class="nav-link" id="http-tab" href="#http" role="tab" aria-controls="http" aria-selected="false">HTTP</a>
+            </li>
+        </ul>
+        
+        <div class="tab-content" id="tools-tab-content">
+            <!-- Ping Tool -->
+            <div class="tab-pane active" id="ping" role="tabpanel" aria-labelledby="ping-tab">
+                <div class="module-card">
+                    <div class="module-card-header">
+                        <h3>Ping</h3>
+                    </div>
+                    <div class="module-card-body">
+                        <p class="text-muted">Test connectivity to a host by sending ICMP echo requests.</p>
+                        <form id="ping-form" method="POST">
+                            <div class="form-field">
+                                <label for="ping-target">Target Host</label>
+                                <input type="text" id="ping-target" name="target" placeholder="example.com or IP address" required>
+                                <small class="form-help">The hostname or IP address to ping.</small>
+                            </div>
+                            <div class="form-field capture-options-grid">
+                                <div>
+                                    <label for="ping-count">Packet Count</label>
+                                    <input type="number" id="ping-count" name="count" value="4" min="1" max="100">
+                                    <small class="form-help">Number of packets to send.</small>
+                                </div>
+                                <div>
+                                    <label for="ping-timeout">Timeout (sec)</label>
+                                    <input type="number" id="ping-timeout" name="timeout" value="2" min="1" max="10">
+                                    <small class="form-help">Timeout in seconds.</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <label for="ping-interface">Network Interface</label>
+                                <select id="ping-interface" name="interface">
+                                    <option value="">-- Select Interface --</option>
+                                </select>
+                                <small class="form-help">Specific interface to use for ping (optional).</small>
+                            </div>
+                            <div class="form-field">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="ping-stream-toggle" checked>
+                                    <label class="form-check-label" for="ping-stream-toggle">
+                                        Show Live Output
+                                    </label>
+                                    <small class="form-help">Stream results in real-time as they become available.</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <button type="submit" class="button button-primary">Run Ping</button>
+                                <button type="button" id="ping-stop" class="button button-danger" disabled>Stop</button>
+                            </div>
+                        </form>
+                        <div class="result-container">
+                            <pre id="ping-results" class="tool-results">Results will appear here</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Traceroute Tool -->
+            <div class="tab-pane" id="traceroute" role="tabpanel" aria-labelledby="traceroute-tab">
+                <div class="module-card">
+                    <div class="module-card-header">
+                        <h3>Traceroute</h3>
+                    </div>
+                    <div class="module-card-body">
+                        <p class="text-muted">Trace the route packets take to a network host.</p>
+                        <form id="traceroute-form" method="POST">
+                            <div class="form-field">
+                                <label for="traceroute-target">Target Host</label>
+                                <input type="text" id="traceroute-target" name="target" placeholder="example.com or IP address" required>
+                                <small class="form-help">The hostname or IP address to trace.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="traceroute-max-hops">Max Hops</label>
+                                <input type="number" id="traceroute-max-hops" name="max_hops" value="30" min="1" max="64">
+                                <small class="form-help">Maximum number of hops to trace.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="traceroute-interface">Network Interface</label>
+                                <select id="traceroute-interface" name="interface">
+                                    <option value="">-- Select Interface --</option>
+                                </select>
+                                <small class="form-help">Specific interface to use for traceroute (optional).</small>
+                            </div>
+                            <div class="form-field">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="traceroute-stream-toggle" checked>
+                                    <label class="form-check-label" for="traceroute-stream-toggle">
+                                        Show Live Output
+                                    </label>
+                                    <small class="form-help">Stream results in real-time as they become available.</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <button type="submit" class="button button-primary">Run Traceroute</button>
+                                <button type="button" id="traceroute-stop" class="button button-danger" disabled>Stop</button>
+                            </div>
+                        </form>
+                        <div class="result-container">
+                            <pre id="traceroute-results" class="tool-results">Results will appear here</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- DNS Lookup Tool -->
+            <div class="tab-pane" id="dns" role="tabpanel" aria-labelledby="dns-tab">
+                <div class="module-card">
+                    <div class="module-card-header">
+                        <h3>DNS Lookup</h3>
+                    </div>
+                    <div class="module-card-body">
+                        <p class="text-muted">Lookup DNS records for a domain.</p>
+                        <form id="dns-form" method="POST">
+                            <div class="form-field">
+                                <label for="dns-target">Domain Name</label>
+                                <input type="text" id="dns-target" name="target" placeholder="example.com" required>
+                                <small class="form-help">The domain name to query.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="dns-type">Record Type</label>
+                                <select id="dns-type" name="record_type">
+                                    <option value="A">A</option>
+                                    <option value="AAAA">AAAA</option>
+                                    <option value="CNAME">CNAME</option>
+                                    <option value="MX">MX</option>
+                                    <option value="NS">NS</option>
+                                    <option value="PTR">PTR</option>
+                                    <option value="SOA">SOA</option>
+                                    <option value="TXT">TXT</option>
+                                    <option value="ANY">ANY</option>
+                                </select>
+                                <small class="form-help">Type of DNS record to query.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="dns-interface">Network Interface</label>
+                                <select id="dns-interface" name="interface">
+                                    <option value="">-- Select Interface --</option>
+                                </select>
+                                <small class="form-help">Specific interface to use for DNS lookup (optional).</small>
+                            </div>
+                            <div class="form-field">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="dns-stream-toggle" checked>
+                                    <label class="form-check-label" for="dns-stream-toggle">
+                                        Show Live Output
+                                    </label>
+                                    <small class="form-help">Stream results in real-time as they become available.</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <button type="submit" class="button button-primary">Run DNS Lookup</button>
+                                <button type="button" id="dns-stop" class="button button-danger" disabled>Stop</button>
+                            </div>
+                        </form>
+                        <div class="result-container">
+                            <pre id="dns-results" class="tool-results">Results will appear here</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- MTR Tool -->
+            <div class="tab-pane" id="mtr" role="tabpanel" aria-labelledby="mtr-tab">
+                <div class="module-card">
+                    <div class="module-card-header">
+                        <h3>MTR (My Traceroute)</h3>
+                    </div>
+                    <div class="module-card-body">
+                        <p class="text-muted">Combines the functionality of ping and traceroute into a single diagnostic tool.</p>
+                        <form id="mtr-form" method="POST">
+                            <div class="form-field">
+                                <label for="mtr-target">Target Host</label>
+                                <input type="text" id="mtr-target" name="target" placeholder="example.com or IP address" required>
+                                <small class="form-help">The hostname or IP address to trace.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="mtr-count">Packet Count</label>
+                                <input type="number" id="mtr-count" name="count" value="10" min="1" max="100">
+                                <small class="form-help">Number of packets to send.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="mtr-interface">Network Interface</label>
+                                <select id="mtr-interface" name="interface">
+                                    <option value="">-- Select Interface --</option>
+                                </select>
+                                <small class="form-help">Specific interface to use for MTR (optional).</small>
+                            </div>
+                            <div class="form-field">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="mtr-stream-toggle" checked>
+                                    <label class="form-check-label" for="mtr-stream-toggle">
+                                        Show Live Output
+                                    </label>
+                                    <small class="form-help">Stream results in real-time as they become available.</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <button type="submit" class="button button-primary">Run MTR</button>
+                                <button type="button" id="mtr-stop" class="button button-danger" disabled>Stop</button>
+                            </div>
+                        </form>
+                        <div class="result-container">
+                            <pre id="mtr-results" class="tool-results">Results will appear here</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- iPerf3 Tool -->
+            <div class="tab-pane" id="iperf" role="tabpanel" aria-labelledby="iperf-tab">
+                <div class="module-card">
+                    <div class="module-card-header">
+                        <h3>iPerf3 Client</h3>
+                    </div>
+                    <div class="module-card-body">
+                        <p class="text-muted">Measure network bandwidth performance to an iPerf3 server.</p>
+                        <form id="iperf-form" method="POST">
+                            <div class="form-field">
+                                <label for="iperf-server">iPerf3 Server</label>
+                                <input type="text" id="iperf-server" name="server" placeholder="iperf.server.example.com or IP" required>
+                                <small class="form-help">The hostname or IP of an iPerf3 server.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="iperf-port">Port</label>
+                                <input type="number" id="iperf-port" name="port" value="5201" min="1" max="65535">
+                                <small class="form-help">Server port.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="iperf-duration">Duration</label>
+                                <input type="number" id="iperf-duration" name="duration" value="5" min="1" max="60">
+                                <small class="form-help">Test duration in seconds.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="iperf-protocol">Protocol</label>
+                                <select id="iperf-protocol" name="protocol">
+                                    <option value="tcp">TCP</option>
+                                    <option value="udp">UDP</option>
+                                </select>
+                                <small class="form-help">TCP or UDP.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="iperf-interface">Network Interface</label>
+                                <select id="iperf-interface" name="interface">
+                                    <option value="">-- Select Interface --</option>
+                                </select>
+                                <small class="form-help">Specific interface to use for iPerf test (optional).</small>
+                            </div>
+                            <div class="form-field">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="iperf-stream-toggle" checked>
+                                    <label class="form-check-label" for="iperf-stream-toggle">
+                                        Show Live Output
+                                    </label>
+                                    <small class="form-help">Stream results in real-time as they become available.</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <button type="submit" class="button button-primary">Run iPerf3 Test</button>
+                                <button type="button" id="iperf-stop" class="button button-danger" disabled>Stop</button>
+                            </div>
+                        </form>
+                        <div class="result-container">
+                            <pre id="iperf-results" class="tool-results">Results will appear here</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Nmap Tool -->
+            <div class="tab-pane" id="nmap" role="tabpanel" aria-labelledby="nmap-tab">
+                <div class="module-card">
+                    <div class="module-card-header">
+                        <h3>Nmap Port Scanner</h3>
+                    </div>
+                    <div class="module-card-body">
+                        <p class="text-muted">Scan for open ports on a host.</p>
+                        <form id="nmap-form" method="POST">
+                            <div class="form-field">
+                                <label for="nmap-target">Target Host</label>
+                                <input type="text" id="nmap-target" name="target" placeholder="example.com or IP address" required>
+                                <small class="form-help">The hostname, IP address, or IP range to scan.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="nmap-scan-type">Scan Type</label>
+                                <select id="nmap-scan-type" name="scan_type">
+                                    <option value="basic">Basic Scan</option>
+                                    <option value="service">Service Detection</option>
+                                    <option value="os">OS Detection</option>
+                                </select>
+                                <small class="form-help">Type of scan to perform.</small>
+                            </div>
+                            <div class="form-field">
+                                <label for="nmap-interface">Network Interface</label>
+                                <select id="nmap-interface" name="interface">
+                                    <option value="">-- Select Interface --</option>
+                                </select>
+                                <small class="form-help">Specific interface to use for Nmap scan (optional).</small>
+                            </div>
+                            <div class="form-field">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="nmap-stream-toggle" checked>
+                                    <label class="form-check-label" for="nmap-stream-toggle">
+                                        Show Live Output
+                                    </label>
+                                    <small class="form-help">Stream results in real-time as they become available.</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <button type="submit" class="button button-primary">Run Port Scan</button>
+                                <button type="button" id="nmap-stop" class="button button-danger" disabled>Stop</button>
+                            </div>
+                        </form>
+                        <div class="result-container">
+                            <pre id="nmap-results" class="tool-results">Results will appear here</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- HTTP Tool -->
+            <div class="tab-pane" id="http" role="tabpanel" aria-labelledby="http-tab">
+                <div class="module-card">
+                    <div class="module-card-header">
+                        <h3>HTTP Request</h3>
+                    </div>
+                    <div class="module-card-body">
+                        <p class="text-muted">Make an HTTP request to a URL and view the response details.</p>
+                        <form id="http-form" method="POST">
+                            <div class="form-field">
+                                <label for="http-url">URL</label>
+                                <input type="text" id="http-url" name="url" placeholder="https://example.com" required>
+                                <small class="form-help">The URL to request. HTTP:// will be added if missing.</small>
+                            </div>
+                            <div class="form-field">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="http-follow" name="follow_redirects" value="true" checked>
+                                    <label class="form-check-label" for="http-follow">
+                                        Follow Redirects
+                                    </label>
+                                    <small class="form-help">Whether to follow HTTP redirects (301, 302, etc).</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <label for="http-interface">Network Interface</label>
+                                <select id="http-interface" name="interface">
+                                    <option value="">-- Select Interface --</option>
+                                </select>
+                                <small class="form-help">Specific interface to use for HTTP request (optional).</small>
+                            </div>
+                            <div class="form-field">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="http-stream-toggle" checked>
+                                    <label class="form-check-label" for="http-stream-toggle">
+                                        Show Live Output
+                                    </label>
+                                    <small class="form-help">Stream results in real-time as they become available.</small>
+                                </div>
+                            </div>
+                            <div class="form-field">
+                                <button type="submit" class="button button-primary">Make HTTP Request</button>
+                                <button type="button" id="http-stop" class="button button-danger" disabled>Stop</button>
+                            </div>
+                        </form>
+                        <div class="result-container">
+                            <pre id="http-results" class="tool-results">Results will appear here</pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/tools.js') }}"></script>
+{% endblock %} 

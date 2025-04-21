@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Confirm Connection Sharing{% endblock %}
+
+{% block extra_css %}
+<style>
+    .confirmation-container {
+        max-width: 600px;
+        margin: 100px auto;
+        padding: 30px;
+        background-color: var(--card-bg);
+        border-radius: 10px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.15);
+    }
+    
+    .confirmation-header {
+        margin-bottom: 30px;
+        text-align: center;
+    }
+    
+    .confirmation-header h1 {
+        color: var(--accent-color);
+    }
+    
+    .confirmation-content {
+        margin-bottom: 30px;
+    }
+    
+    .confirmation-timer {
+        text-align: center;
+        margin: 20px 0;
+        font-size: 24px;
+        font-weight: bold;
+    }
+    
+    .confirmation-actions {
+        display: flex;
+        justify-content: space-between;
+    }
+    
+    .countdown {
+        color: #e74c3c;
+    }
+    
+    .config-details {
+        background-color: var(--bg-alt);
+        padding: 15px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+    }
+    
+    .config-details dl {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 10px;
+    }
+    
+    .config-details dt {
+        font-weight: bold;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="confirmation-container">
+    <div class="confirmation-header">
+        <h1>Confirm Connection Sharing</h1>
+        <p>The network connection sharing settings have been changed</p>
+    </div>
+    
+    <div class="confirmation-content">
+        <p>Your connection sharing settings will be reverted automatically in <span id="countdown" class="countdown">5:00</span> if not confirmed.</p>
+        
+        <div class="config-details">
+            <h3>Current Configuration:</h3>
+            <dl>
+                <dt>Source Interface:</dt>
+                <dd id="source-interface">{{ config.source }}</dd>
+                
+                <dt>Target Interface:</dt>
+                <dd id="target-interface">{{ config.target }}</dd>
+                
+                <dt>NAT Enabled:</dt>
+                <dd id="nat-enabled">{{ "Yes" if config.nat_enabled else "No" }}</dd>
+                
+                <dt>DNS Servers:</dt>
+                <dd id="dns-servers">{{ config.dns_servers|join(', ') if config.dns_servers else "Default" }}</dd>
+            </dl>
+        </div>
+        
+        <p><strong>Warning:</strong> If you cannot access the internet after confirming these settings, you may need to check your configuration or reconnect to the network.</p>
+    </div>
+    
+    <div class="confirmation-actions">
+        <button id="revert-btn" class="btn danger">Revert Changes</button>
+        <button id="confirm-btn" class="btn primary">Keep These Settings</button>
+    </div>
+</div>
+
+<script>
+    // Initialize countdown timer
+    let timeLeft = {{ timeout }};
+    
+    function updateTimer() {
+        const minutes = Math.floor(timeLeft / 60);
+        const seconds = timeLeft % 60;
+        document.getElementById('countdown').textContent = `${minutes}:${seconds < 10 ? '0' : ''}${seconds}`;
+        
+        if (timeLeft <= 0) {
+            clearInterval(timerInterval);
+            // Reload the page to show the reverted configuration
+            window.location.reload();
+            return;
+        }
+        
+        timeLeft--;
+    }
+    
+    // Update timer immediately and then every second
+    updateTimer();
+    const timerInterval = setInterval(updateTimer, 1000);
+    
+    // Handle confirmation
+    document.getElementById('confirm-btn').addEventListener('click', function() {
+        this.disabled = true;
+        this.textContent = 'Confirming...';
+        
+        // Call the confirmation API
+        fetch('/api/network/connection_sharing/confirm', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                clearInterval(timerInterval);
+                alert('Connection sharing configuration confirmed successfully.');
+                window.location.href = '/';
+            } else {
+                alert('Error: ' + data.message);
+                this.disabled = false;
+                this.textContent = 'Keep These Settings';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to confirm connection sharing settings.');
+            this.disabled = false;
+            this.textContent = 'Keep These Settings';
+        });
+    });
+    
+    // Handle revert
+    document.getElementById('revert-btn').addEventListener('click', function() {
+        this.disabled = true;
+        this.textContent = 'Reverting...';
+        
+        // Call the disable API to revert
+        fetch('/api/network/connection_sharing/disable', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                clearInterval(timerInterval);
+                alert('Connection sharing configuration reverted successfully.');
+                window.location.href = '/';
+            } else {
+                alert('Error: ' + data.message);
+                this.disabled = false;
+                this.textContent = 'Revert Changes';
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to revert connection sharing settings.');
+            this.disabled = false;
+            this.textContent = 'Revert Changes';
+        });
+    });
+</script>
+{% endblock %} 

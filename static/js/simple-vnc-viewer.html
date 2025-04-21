@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple VNC Viewer</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: system-ui, sans-serif;
+            background: #222;
+            color: #eee;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        .header {
+            background: #333;
+            padding: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .main {
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        .viewer {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+        .status {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            right: 15px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 5px;
+            padding: 10px;
+            z-index: 100;
+            transition: opacity 0.5s;
+        }
+        .connection-options {
+            display: flex;
+            gap: 10px;
+        }
+        select, button {
+            background: #444;
+            color: #fff;
+            border: none;
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        select:hover, button:hover {
+            background: #555;
+        }
+        button.primary {
+            background: #275d8b;
+        }
+        button.primary:hover {
+            background: #326da1;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>VNC Viewer</h2>
+            <div class="connection-options">
+                <select id="connection-type">
+                    <option value="auto">Current IP (Auto)</option>
+                    <option value="localhost">Localhost</option>
+                    <option value="ip">Custom IP</option>
+                </select>
+                <input type="text" id="custom-ip" placeholder="192.168.4.1" style="display: none; background: #444; color: #fff; border: none; padding: 8px; border-radius: 4px;">
+                <button class="primary" id="connect-btn">Connect</button>
+                <button id="alt-btn">Show Connection Info</button>
+            </div>
+        </div>
+        
+        <div class="main">
+            <iframe id="viewer" class="viewer"></iframe>
+            <div id="status" class="status">Ready to connect...</div>
+        </div>
+    </div>
+    
+    <script>
+        // Simple elements
+        const viewer = document.getElementById('viewer');
+        const status = document.getElementById('status');
+        const connectBtn = document.getElementById('connect-btn');
+        const altBtn = document.getElementById('alt-btn');
+        const connectionType = document.getElementById('connection-type');
+        const customIpInput = document.getElementById('custom-ip');
+        
+        // Default values
+        let currentHost = window.location.hostname || 'localhost';
+        let infoVisible = false;
+        
+        // Show the custom IP input when selected
+        connectionType.addEventListener('change', function() {
+            customIpInput.style.display = this.value === 'ip' ? 'block' : 'none';
+        });
+        
+        // Toggle connection info display
+        altBtn.addEventListener('click', function() {
+            if (!infoVisible) {
+                showConnectionInfo();
+                altBtn.textContent = 'Hide Connection Info';
+            } else {
+                status.innerHTML = 'Ready to connect...';
+                status.style.top = '';
+                status.style.height = '';
+                status.style.overflow = '';
+                altBtn.textContent = 'Show Connection Info';
+            }
+            infoVisible = !infoVisible;
+        });
+        
+        // Handle connection button
+        connectBtn.addEventListener('click', function() {
+            connectVNC();
+        });
+        
+        // Main function to connect to VNC
+        function connectVNC() {
+            const type = connectionType.value;
+            
+            // Determine host based on selection
+            let host = currentHost;
+            if (type === 'localhost') {
+                host = 'localhost';
+            } else if (type === 'ip' && customIpInput.value.trim()) {
+                host = customIpInput.value.trim();
+            }
+            
+            // Update status
+            status.textContent = `Connecting to ${host}:6080...`;
+            
+            // Create URL for VNC lite client - explicitly set empty path
+            const vncUrl = `/static/novnc/vnc_lite.html?host=${host}&port=6080&path=&autoconnect=true&resize=scale`;
+            
+            // Set iframe source
+            viewer.src = vncUrl;
+            
+            // Hide status message after delay
+            setTimeout(() => {
+                status.style.opacity = '0';
+            }, 5000);
+            
+            // Log connection attempt
+            console.log(`Attempting to connect to VNC at: ${host}:6080`);
+        }
+        
+        // Show comprehensive connection information
+        function showConnectionInfo() {
+            const hosts = [currentHost, 'localhost'];
+            
+            // Add 192.168.4.1 if it's not already in the list
+            if (!hosts.includes('192.168.4.1')) {
+                hosts.push('192.168.4.1');
+            }
+            
+            // Create information panel
+            let infoHtml = `
+                <h3>VNC Connection Information</h3>
+                <p>You can connect to the VNC server using any of these options:</p>
+                <table style="margin: 0 auto; border-collapse: collapse;">
+                    <tr style="background: #333;">
+                        <th style="padding: 8px; text-align: left;">Connection Type</th>
+                        <th style="padding: 8px; text-align: left;">Host</th>
+                        <th style="padding: 8px; text-align: left;">Port</th>
+                    </tr>
+            `;
+            
+            // Add websockify connections
+            hosts.forEach(host => {
+                infoHtml += `
+                    <tr style="border-bottom: 1px solid #333;">
+                        <td style="padding: 8px;">WebSocket (NoVNC)</td>
+                        <td style="padding: 8px;">${host}</td>
+                        <td style="padding: 8px;">6080</td>
+                    </tr>
+                `;
+            });
+            
+            // Add direct VNC connections
+            hosts.forEach(host => {
+                infoHtml += `
+                    <tr style="border-bottom: 1px solid #333;">
+                        <td style="padding: 8px;">Direct VNC</td>
+                        <td style="padding: 8px;">${host}</td>
+                        <td style="padding: 8px;">5900</td>
+                    </tr>
+                `;
+            });
+            
+            infoHtml += `
+                </table>
+                <p style="margin-top: 15px;">If one connection method fails, try another.</p>
+                <p>For native VNC clients, use the Direct VNC connection details.</p>
+            `;
+            
+            // Update the status element
+            status.innerHTML = infoHtml;
+            status.style.top = '70px';
+            status.style.height = 'auto';
+            status.style.maxHeight = 'calc(100% - 100px)';
+            status.style.overflow = 'auto';
+            status.style.opacity = '1';
+        }
+        
+        // Initialize - auto-connect on load to current hostname
+        connectVNC();
+    </script>
+</body>
+</html> 

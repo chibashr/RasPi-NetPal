@@ -1,0 +1,479 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block nav_dashboard %}active{% endblock %}
+
+{% block content %}
+<!-- Your content goes here -->
+<div class="grid-layout">
+    <section class="grid-span-2">
+        <h2>
+            System Status
+            <span class="section-toggle" data-target="system-status" onclick="toggleSection('system-status')">Hide</span>
+        </h2>
+        <div id="system-status" class="card">
+            <div class="row">
+                <div class="col">
+                    <div class="system-info-item">
+                        <span class="info-label">OS:</span>
+                        <span id="os-info" class="info-value"><span class="loading-spinner"></span></span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="info-label">Uptime:</span>
+                        <span id="uptime-info" class="info-value"><span class="loading-spinner"></span></span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="info-label">Load Average:</span>
+                        <span id="load-avg-info" class="info-value"><span class="loading-spinner"></span></span>
+                    </div>
+                </div>
+                <div class="col">
+                    <div class="system-info-item">
+                        <span class="info-label">CPU:</span>
+                        <span id="cpu-info" class="info-value"><span class="loading-spinner"></span></span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="info-label">Memory:</span>
+                        <span id="memory-info" class="info-value"><span class="loading-spinner"></span></span>
+                    </div>
+                    <div class="system-info-item">
+                        <span class="info-label">Temperature:</span>
+                        <span id="temp-info" class="info-value"><span class="loading-spinner"></span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>
+            Storage
+            <span class="section-toggle" data-target="storage-section" onclick="toggleSection('storage-section')">Hide</span>
+        </h2>
+        <div id="storage-section" class="card">
+            <div id="storage-info">
+                <div class="loading"><span class="loading-spinner"></span> Loading storage information</div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>
+            Network Interfaces
+            <span class="section-toggle" data-target="network-interfaces" onclick="toggleSection('network-interfaces')">Hide</span>
+        </h2>
+        <div id="network-interfaces" class="card">
+            <div id="interfaces-container">
+                <div class="loading"><span class="loading-spinner"></span> Loading network interfaces</div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>
+            Connection Sharing
+            <span class="section-toggle" data-target="connection-sharing" onclick="toggleSection('connection-sharing')">Hide</span>
+        </h2>
+        <div id="connection-sharing" class="card">
+            <p>Share internet connection between network interfaces</p>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+                <div class="form-group">
+                    <label>Share Connection From:</label>
+                    <select id="source-interface" class="form-control">
+                        <option value="" disabled selected>Select Source Interface</option>
+                        <option value="usb0">USB Tethering (usb0)</option>
+                        <option value="eth0">Ethernet (eth0)</option>
+                    </select>
+                    <small class="form-help">Interface with internet connectivity</small>
+                </div>
+                
+                <div class="form-group">
+                    <label>Share To:</label>
+                    <select id="target-interface" class="form-control">
+                        <option value="" disabled selected>Select Target Interface</option>
+                        <option value="wlan0">Wi-Fi AP (wlan0)</option>
+                    </select>
+                    <small class="form-help">Interface to share connection with</small>
+                </div>
+            </div>
+            
+            <div class="form-check" style="background-color: rgba(46, 204, 113, 0.1); padding: 10px; border-radius: 5px; border-left: 4px solid #2ecc71; margin-bottom: 15px;">
+                <input type="checkbox" id="enable-nat" class="form-check-input" checked>
+                <label for="enable-nat" class="form-check-label"><strong>Enable NAT (Network Address Translation)</strong></label>
+                <p class="form-help" style="margin-top: 5px; margin-bottom: 0;">Allows devices connected to the target interface to access the internet through the source connection. DNS servers will be forwarded automatically.</p>
+            </div>
+            
+            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                <button id="apply-sharing" class="btn primary">Apply Sharing</button>
+                <button id="stop-sharing" class="btn danger">Stop Sharing</button>
+            </div>
+            
+            <div id="sharing-status" class="status-container" style="margin-bottom: 15px;">
+                <p>Status: <span class="badge error">Not Active</span></p>
+            </div>
+            
+            <div class="help-text" style="margin-top: 0; padding: 10px; background-color: rgba(52, 152, 219, 0.1); border-radius: 5px; border-left: 4px solid #3498db;">
+                <p style="margin: 0;"><strong>Note:</strong> When applying connection sharing, the AP will restart briefly. After reconnecting, you'll have 1 minute to confirm the settings, or they'll automatically revert to prevent lockouts.</p>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>
+            Serial Devices
+            <span class="section-toggle" data-target="serial-devices" onclick="toggleSection('serial-devices')">Hide</span>
+        </h2>
+        <div id="serial-devices" class="card">
+            <div id="serial-devices-container">
+                <div class="loading"><span class="loading-spinner"></span> Loading serial devices</div>
+            </div>
+        </div>
+    </section>
+
+    <section>
+        <h2>
+            Services
+            <span class="section-toggle" data-target="services-section" onclick="toggleSection('services-section')">Hide</span>
+        </h2>
+        <div id="services-section" class="card">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Service</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="services-table-body">
+                    <tr>
+                        <td colspan="3" class="text-center"><span class="loading-spinner"></span> Loading services</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="grid-span-2">
+        <h2>
+            System Logs
+            <span class="section-toggle" data-target="logs-section" onclick="toggleSection('logs-section')">Hide</span>
+        </h2>
+        <div id="logs-section" class="card">
+            <div class="log-controls">
+                <div>
+                    <span>Filter:</span>
+                    <button id="filter-all" class="log-filter active">All</button>
+                    <button id="filter-info" class="log-filter">Info</button>
+                    <button id="filter-error" class="log-filter">Errors</button>
+                </div>
+                <div>
+                    <button id="clear-logs-btn" class="button button-sm button-danger">Clear Logs</button>
+                </div>
+            </div>
+            <div id="logs-container">
+                <div class="loading"><span class="loading-spinner"></span> Loading logs</div>
+            </div>
+        </div>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Error handling to catch and log any JavaScript errors
+window.onerror = function(message, source, lineno, colno, error) {
+    console.error("JavaScript error:", message, "at", source, "line:", lineno, "column:", colno);
+    console.error("Error details:", error);
+    
+    // Log visible element for debugging
+    const debugInfo = {
+        'os-info': document.getElementById('os-info') ? true : false,
+        'uptime-info': document.getElementById('uptime-info') ? true : false,
+        'load-avg-info': document.getElementById('load-avg-info') ? true : false,
+        'cpu-info': document.getElementById('cpu-info') ? true : false,
+        'memory-info': document.getElementById('memory-info') ? true : false,
+        'temp-info': document.getElementById('temp-info') ? true : false,
+        'storage-info': document.getElementById('storage-info') ? true : false
+    };
+    console.log("Debug element existence:", debugInfo);
+    
+    return false; // Let the error propagate
+};
+
+// Network connection sharing functionality
+document.addEventListener('DOMContentLoaded', function() {
+    // Get elements
+    const sourceInterface = document.getElementById('source-interface');
+    const targetInterface = document.getElementById('target-interface');
+    const enableNat = document.getElementById('enable-nat');
+    const applyButton = document.getElementById('apply-sharing');
+    const stopButton = document.getElementById('stop-sharing');
+    const sharingStatus = document.getElementById('sharing-status')?.querySelector('span');
+    
+    if (!sourceInterface || !targetInterface || !enableNat || !applyButton || !stopButton || !sharingStatus) {
+        console.error("Some connection sharing elements not found");
+        return;
+    }
+    
+    // Check current connection sharing status on page load
+    fetchSharingStatus();
+    
+    // Update available interfaces on page load
+    fetchInterfaces();
+    
+    // Apply sharing configuration
+    applyButton.addEventListener('click', function() {
+        if (!sourceInterface.value || !targetInterface.value) {
+            alert('Please select both source and target interfaces');
+            return;
+        }
+        
+        applyButton.disabled = true;
+        applyButton.textContent = 'Applying...';
+        
+        fetch('/api/network/connection_sharing/enable', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                source: sourceInterface.value,
+                target: targetInterface.value,
+                enable_nat: enableNat.checked
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                sharingStatus.textContent = 'Active';
+                sharingStatus.className = 'badge success';
+                alert('Connection sharing enabled successfully.\n\nNote: Devices connected to the AP may need to reconnect to get internet access.');
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to enable connection sharing');
+        })
+        .finally(() => {
+            applyButton.disabled = false;
+            applyButton.textContent = 'Apply Sharing';
+        });
+    });
+    
+    // Stop sharing
+    stopButton.addEventListener('click', function() {
+        stopButton.disabled = true;
+        stopButton.textContent = 'Stopping...';
+        
+        fetch('/api/network/connection_sharing/disable', {
+            method: 'POST',
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                sharingStatus.textContent = 'Not Active';
+                sharingStatus.className = 'badge error';
+                alert('Connection sharing disabled successfully');
+            } else {
+                alert('Error: ' + data.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('Failed to disable connection sharing');
+        })
+        .finally(() => {
+            stopButton.disabled = false;
+            stopButton.textContent = 'Stop Sharing';
+        });
+    });
+    
+    // Fetch available interfaces
+    function fetchInterfaces() {
+        fetch('/api/network/interfaces')
+        .then(response => response.json())
+        .then(data => {
+            // Clear existing options except the default
+            while (sourceInterface.options.length > 1) {
+                sourceInterface.remove(1);
+            }
+            
+            // Add new options from available interfaces, prioritizing those with internet
+            let internetInterfaces = [];
+            let otherInterfaces = [];
+            
+            data.interfaces.forEach(iface => {
+                if (iface.name !== 'lo' && iface.name !== 'wlan0') {
+                    const option = document.createElement('option');
+                    option.value = iface.name;
+                    
+                    // Create descriptive label based on internet connectivity
+                    let label = `${iface.name} (${iface.addr || 'No IP'})`;
+                    if (iface.has_internet) {
+                        label += ' ✓ Internet';
+                        option.setAttribute('data-has-internet', 'true');
+                        internetInterfaces.push(option);
+                    } else {
+                        otherInterfaces.push(option);
+                    }
+                    option.textContent = label;
+                }
+            });
+            
+            // Add internet-connected interfaces first
+            internetInterfaces.forEach(option => {
+                sourceInterface.appendChild(option);
+            });
+            
+            // Then add other interfaces
+            otherInterfaces.forEach(option => {
+                sourceInterface.appendChild(option);
+            });
+            
+            // Select the first internet-connected interface if available
+            if (internetInterfaces.length > 0) {
+                sourceInterface.value = internetInterfaces[0].value;
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching interfaces:', error);
+        });
+    }
+    
+    // Fetch current sharing status
+    function fetchSharingStatus() {
+        fetch('/api/network/connection_sharing/status')
+        .then(response => response.json())
+        .then(data => {
+            if (data.active) {
+                sharingStatus.textContent = 'Active';
+                sharingStatus.className = 'badge success';
+                
+                // Set form values based on current configuration
+                sourceInterface.value = data.source;
+                targetInterface.value = data.target;
+                enableNat.checked = data.nat_enabled;
+            } else {
+                sharingStatus.textContent = 'Not Active';
+                sharingStatus.className = 'badge error';
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching sharing status:', error);
+        });
+    }
+});
+
+// Debug function to test API endpoints directly
+window.testEndpoints = function() {
+    console.log("Testing API endpoints...");
+    
+    // Test get_updates endpoint
+    fetch('/get_updates')
+        .then(response => {
+            console.log("get_updates status:", response.status);
+            if (!response.ok) {
+                console.error("get_updates error:", response.statusText);
+                return null;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data) {
+                console.log("get_updates data:", data);
+            }
+        })
+        .catch(error => console.error("get_updates fetch error:", error));
+    
+    // Test get_storage_info endpoint
+    fetch('/get_storage_info')
+        .then(response => {
+            console.log("get_storage_info status:", response.status);
+            if (!response.ok) {
+                console.error("get_storage_info error:", response.statusText);
+                return null;
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data) {
+                console.log("get_storage_info data:", data);
+            }
+        })
+        .catch(error => console.error("get_storage_info fetch error:", error));
+    
+    console.log("API tests started. Check console for results.");
+};
+</script>
+<script src="{{ url_for('static', filename='js/main.js') }}"></script>
+<style>
+.loading-spinner {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 3px solid rgba(0, 0, 0, 0.1);
+    border-radius: 50%;
+    border-top-color: var(--primary-color, #28a745);
+    animation: spin 1s ease-in-out infinite;
+    margin-right: 8px;
+    vertical-align: middle;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.dark-mode .loading-spinner {
+    border-color: rgba(255, 255, 255, 0.1);
+    border-top-color: var(--primary-color, #4caf50);
+}
+
+.loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    color: #666;
+}
+
+.dark-mode .loading {
+    color: #aaa;
+}
+
+/* Interface action buttons */
+.btn-group {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+}
+
+.btn-group .button {
+    margin: 0;
+    padding: 2px 8px;
+    font-size: 0.8rem;
+}
+
+.network-table th, .network-table td {
+    padding: 8px;
+    text-align: left;
+}
+
+/* Responsive design for mobile */
+@media (max-width: 768px) {
+    .btn-group {
+        flex-direction: column;
+        gap: 2px;
+    }
+    
+    .network-table th:nth-child(4), 
+    .network-table td:nth-child(4) {
+        max-width: 90px;
+    }
+}
+</style>
+{% endblock %} 

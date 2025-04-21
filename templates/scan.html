@@ -1,0 +1,1112 @@
+{% extends "base.html" %}
+
+{% block title %}Network Scanner{% endblock %}
+
+{% block nav_scan %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .scan-controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+        margin-bottom: 10px;
+    }
+    
+    .scan-section {
+        background-color: #f5f5f5;
+        border-radius: 5px;
+        padding: 10px;
+        margin-bottom: 15px;
+    }
+    
+    .scan-section h3 {
+        margin-top: 0;
+        margin-bottom: 10px;
+        font-size: 1.1em;
+    }
+    
+    /* Fixed checkbox layout with !important to override any conflicting styles */
+    .option-row {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        margin-bottom: 4px !important;
+    }
+    
+    .option-cell {
+        width: 50% !important;
+        padding: 4px 0 !important;
+        box-sizing: border-box !important;
+    }
+    
+    .option-label {
+        display: flex !important;
+        align-items: flex-start !important;
+        cursor: pointer !important;
+    }
+    
+    .option-label input[type="checkbox"] {
+        margin: 2px 8px 0 0 !important;
+        width: auto !important;
+        flex-shrink: 0 !important;
+    }
+    
+    .option-text {
+        display: flex !important;
+        flex-direction: column !important;
+    }
+    
+    .option-title {
+        font-weight: bold !important;
+        margin: 0 !important;
+    }
+    
+    .option-desc {
+        font-size: 0.85em !important;
+        color: #666 !important;
+        margin-top: 2px !important;
+        margin-bottom: 0 !important;
+    }
+    
+    body.dark-mode .option-desc {
+        color: #aaa !important;
+    }
+    
+    @media (max-width: 768px) {
+        .option-row {
+            flex-direction: column !important;
+        }
+        
+        .option-cell {
+            width: 100% !important;
+        }
+    }
+    
+    /* Table-based option layout */
+    .options-table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 5px;
+    }
+    
+    .options-table td {
+        padding: 4px 8px;
+        vertical-align: top;
+        border: none;
+    }
+    
+    .checkbox-container {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: flex-start;
+        margin: 0;
+        cursor: pointer;
+    }
+    
+    .checkbox-container input[type="checkbox"] {
+        margin: 3px 8px 0 0;
+        flex-shrink: 0;
+    }
+    
+    .checkbox-label {
+        font-weight: bold;
+        margin-right: 5px;
+    }
+    
+    .checkbox-desc {
+        font-size: 0.85em;
+        color: #666;
+        width: 100%;
+        margin-top: 2px;
+        margin-left: 20px;
+        display: block;
+    }
+    
+    body.dark-mode .checkbox-desc {
+        color: #aaa;
+    }
+    
+    /* Other existing styles */
+    .scan-list-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 8px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    .scan-item-details {
+        flex: 1;
+    }
+    
+    .scan-item-actions {
+        display: flex;
+        gap: 5px;
+    }
+    
+    .scan-progress {
+        height: 18px;
+        background-color: #e9ecef;
+        border-radius: 4px;
+        margin: 8px 0;
+        overflow: hidden;
+    }
+    
+    .scan-progress-bar {
+        height: 100%;
+        background-color: #4CAF50;
+        text-align: center;
+        color: white;
+        transition: width 0.3s;
+        font-size: 0.8em;
+        line-height: 18px;
+    }
+    
+    .scan-results-table {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .scan-results-table th, .scan-results-table td {
+        padding: 6px 8px;
+        text-align: left;
+        border-bottom: 1px solid #ddd;
+    }
+    
+    .scan-results-table th {
+        background-color: #f2f2f2;
+        position: sticky;
+        top: 0;
+    }
+    
+    .scan-results-table tr.host-up {
+        background-color: rgba(76, 175, 80, 0.1);
+    }
+    
+    .scan-results-container {
+        max-height: 500px;
+        overflow-y: auto;
+        margin-top: 10px;
+    }
+    
+    .scan-tabs {
+        display: flex;
+        border-bottom: 1px solid #ddd;
+        margin-bottom: 15px;
+    }
+    
+    .scan-tab {
+        padding: 8px 12px;
+        cursor: pointer;
+        border: 1px solid transparent;
+        border-bottom: none;
+        margin-bottom: -1px;
+    }
+    
+    .scan-tab.active {
+        border-color: #ddd;
+        border-bottom-color: white;
+        background-color: white;
+    }
+    
+    .scan-panel {
+        display: none;
+    }
+    
+    .scan-panel.active {
+        display: block;
+    }
+    
+    .help-text {
+        font-size: 0.85em;
+        color: #666;
+        margin-top: 3px;
+    }
+    
+    .range-examples {
+        font-size: 0.85em;
+        color: #666;
+        margin-top: 5px;
+        padding: 5px;
+        background-color: #f9f9f9;
+        border-radius: 3px;
+    }
+    
+    .status-badge {
+        display: inline-block;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 0.8em;
+        font-weight: bold;
+    }
+    
+    .status-badge.running {
+        background-color: #3498db;
+        color: white;
+    }
+    
+    .status-badge.completed {
+        background-color: #2ecc71;
+        color: white;
+    }
+    
+    .status-badge.cancelled {
+        background-color: #e74c3c;
+        color: white;
+    }
+    
+    .status-badge.error {
+        background-color: #c0392b;
+        color: white;
+    }
+    
+    .status-badge.pending {
+        background-color: #f39c12;
+        color: white;
+    }
+    
+    .form-group {
+        margin-bottom: 10px;
+    }
+    
+    .form-actions {
+        margin-top: 15px;
+    }
+    
+    .scan-stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+    
+    .scan-stats p {
+        margin: 5px 0;
+    }
+    
+    @media (max-width: 768px) {
+        .scan-controls {
+            grid-template-columns: 1fr;
+        }
+        
+        .scan-stats {
+            grid-template-columns: 1fr;
+        }
+        
+        .options-table, .options-table tbody, .options-table tr, .options-table td {
+            display: block;
+            width: 100% !important;
+        }
+        
+        .options-table td {
+            margin-bottom: 8px;
+        }
+    }
+    
+    /* Dark mode support */
+    body.dark-mode .scan-section {
+        background-color: #2a2a2a;
+    }
+    
+    body.dark-mode .scan-tab.active {
+        border-color: #444;
+        border-bottom-color: #1e1e1e;
+        background-color: #1e1e1e;
+    }
+    
+    body.dark-mode .scan-results-table th {
+        background-color: #2a2a2a;
+    }
+    
+    body.dark-mode .scan-results-table tr.host-up {
+        background-color: rgba(76, 175, 80, 0.2);
+    }
+    
+    body.dark-mode .range-examples {
+        background-color: #2a2a2a;
+        color: #aaa;
+    }
+    
+    body.dark-mode .scan-progress {
+        background-color: #444;
+    }
+    
+    body.dark-mode .help-text {
+        color: #aaa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Network Scanner</h2>
+    
+    <div class="scan-tabs">
+        <div class="scan-tab active" data-panel="new-scan">New Scan</div>
+        <div class="scan-tab" data-panel="scan-history">Scan History</div>
+        <div class="scan-tab" data-panel="current-scan" style="display: none;">Current Scan</div>
+    </div>
+    
+    <!-- New Scan Panel -->
+    <div class="scan-panel active" id="new-scan">
+        <form id="scan-form">
+            <div class="scan-controls">
+                <div class="form-group">
+                    <label for="scan-name">Scan Name</label>
+                    <input type="text" id="scan-name" class="form-control" placeholder="Optional scan name">
+                </div>
+                
+                <div class="form-group">
+                    <label for="interface-select">Network Interface</label>
+                    <select id="interface-select" class="form-control">
+                        <option value="" selected disabled>Select interface...</option>
+                    </select>
+                    <div class="help-text">Select an interface to scan its subnet or specify a custom range below</div>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="target-range">Target Range</label>
+                <input type="text" id="target-range" class="form-control" placeholder="e.g. 192.168.1.0/24, 10.0.0.1-10.0.0.50, or 172.16.1.1,172.16.1.2">
+                <div class="range-examples">
+                    <strong>Examples:</strong><br>
+                    - CIDR: <code>192.168.1.0/24</code><br>
+                    - Range: <code>10.0.0.1-10.0.0.50</code><br>
+                    - List: <code>172.16.1.1,172.16.1.2,172.16.1.5</code><br>
+                    - Mixed: <code>192.168.1.1-192.168.1.10,192.168.2.1</code>
+                </div>
+            </div>
+            
+            <div class="scan-section">
+                <h3>Scan Options</h3>
+                <div class="scan-controls">
+                    <div class="form-group">
+                        <label for="timeout">Ping Timeout (seconds)</label>
+                        <input type="number" id="timeout" class="form-control" value="1" min="0.1" max="10" step="0.1">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="rate-limit-delay">Rate Limit Delay (seconds)</label>
+                        <input type="number" id="rate-limit-delay" class="form-control" value="0.1" min="0.01" max="1" step="0.01" disabled>
+                    </div>
+                </div>
+                
+                <div class="option-row">
+                    <div class="option-cell">
+                        <label class="option-label">
+                            <input type="checkbox" id="quick-scan">
+                            <div class="option-text">
+                                <span class="option-title">Quick Scan</span>
+                                <span class="option-desc">Performs a faster scan with minimal host detection</span>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="option-cell">
+                        <label class="option-label">
+                            <input type="checkbox" id="rate-limit">
+                            <div class="option-text">
+                                <span class="option-title">Rate Limit Scan</span>
+                                <span class="option-desc">Adds delay between host scans to reduce network load</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="option-row">
+                    <div class="option-cell">
+                        <label class="option-label">
+                            <input type="checkbox" id="get-mac" checked>
+                            <div class="option-text">
+                                <span class="option-title">Get MAC Addresses</span>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="option-cell">
+                        <label class="option-label">
+                            <input type="checkbox" id="get-hostname" checked>
+                            <div class="option-text">
+                                <span class="option-title">Resolve Hostnames</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                
+                <div class="option-row">
+                    <div class="option-cell">
+                        <label class="option-label">
+                            <input type="checkbox" id="get-host-type" checked>
+                            <div class="option-text">
+                                <span class="option-title">Identify Host Types</span>
+                                <span class="option-desc">Attempts to identify device type based on MAC vendor</span>
+                            </div>
+                        </label>
+                    </div>
+                    <div class="option-cell">
+                        <!-- Empty cell for alignment -->
+                    </div>
+                </div>
+            </div>
+            
+            <div class="form-actions">
+                <button type="submit" id="start-scan-btn" class="btn primary">Start Scan</button>
+            </div>
+        </form>
+    </div>
+    
+    <!-- Scan History Panel -->
+    <div class="scan-panel" id="scan-history">
+        <div class="loading" id="scan-history-loading">
+            <span class="loading-spinner"></span> Loading scan history...
+        </div>
+        
+        <div class="form-actions">
+            <button id="refresh-history-btn" class="btn secondary">Refresh History</button>
+        </div>
+        
+        <div id="scan-history-list">
+            <!-- Scan history items will be populated here -->
+        </div>
+    </div>
+    
+    <!-- Current Scan Panel -->
+    <div class="scan-panel" id="current-scan">
+        <div class="scan-status" id="current-scan-status">
+            <h3 id="current-scan-name">Scan in Progress</h3>
+            <div class="scan-stats">
+                <p>Status: <span id="current-scan-status-text" class="status-badge running">Running</span></p>
+                <p>Progress: <span id="current-scan-progress-text">0%</span></p>
+                <p>Hosts Scanned: <span id="current-scan-hosts">0/0</span></p>
+                <p>Hosts Discovered: <span id="current-scan-discovered">0</span></p>
+            </div>
+            
+            <div class="scan-progress">
+                <div id="current-scan-progress-bar" class="scan-progress-bar" style="width: 0%">0%</div>
+            </div>
+            
+            <div class="form-actions">
+                <button id="cancel-scan-btn" class="btn danger">Cancel Scan</button>
+                <button id="view-results-btn" class="btn primary">View Results</button>
+                <button id="back-to-history-btn" class="btn secondary" style="display: none;">Back to History</button>
+            </div>
+        </div>
+        
+        <div class="scan-results" id="scan-results-container" style="display: none; margin-top: 15px;">
+            <h3>Scan Results</h3>
+            
+            <div class="form-actions" style="margin-bottom: 10px;">
+                <button id="export-json-btn" class="btn secondary">Export JSON</button>
+                <button id="export-csv-btn" class="btn secondary">Export CSV</button>
+            </div>
+            
+            <div class="scan-results-container">
+                <table class="scan-results-table" id="scan-results-table">
+                    <thead>
+                        <tr>
+                            <th>IP</th>
+                            <th>Status</th>
+                            <th>MAC Address</th>
+                            <th>Hostname</th>
+                            <th>Host Type</th>
+                            <th>Response Time</th>
+                        </tr>
+                    </thead>
+                    <tbody id="scan-results-body">
+                        <!-- Scan results will be populated here -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Track the currently active scan
+    let activeScanId = null;
+    let activeScanInterval = null;
+    let currentResults = null;
+    
+    // DOM Elements
+    const scanForm = document.getElementById('scan-form');
+    const interfaceSelect = document.getElementById('interface-select');
+    const targetRangeInput = document.getElementById('target-range');
+    const scanNameInput = document.getElementById('scan-name');
+    const timeoutInput = document.getElementById('timeout');
+    const rateLimitCheckbox = document.getElementById('rate-limit');
+    const rateLimitDelayInput = document.getElementById('rate-limit-delay');
+    const getMacCheckbox = document.getElementById('get-mac');
+    const getHostnameCheckbox = document.getElementById('get-hostname');
+    const getHostTypeCheckbox = document.getElementById('get-host-type');
+    const quickScanCheckbox = document.getElementById('quick-scan');
+    const scanTabs = document.querySelectorAll('.scan-tab');
+    const scanPanels = document.querySelectorAll('.scan-panel');
+    const startScanBtn = document.getElementById('start-scan-btn');
+    const cancelScanBtn = document.getElementById('cancel-scan-btn');
+    const viewResultsBtn = document.getElementById('view-results-btn');
+    const backToHistoryBtn = document.getElementById('back-to-history-btn');
+    const exportJsonBtn = document.getElementById('export-json-btn');
+    const exportCsvBtn = document.getElementById('export-csv-btn');
+    const refreshHistoryBtn = document.getElementById('refresh-history-btn');
+    const scanHistoryList = document.getElementById('scan-history-list');
+    const scanHistoryLoading = document.getElementById('scan-history-loading');
+    const currentScanName = document.getElementById('current-scan-name');
+    const currentScanStatusText = document.getElementById('current-scan-status-text');
+    const currentScanProgressText = document.getElementById('current-scan-progress-text');
+    const currentScanHosts = document.getElementById('current-scan-hosts');
+    const currentScanDiscovered = document.getElementById('current-scan-discovered');
+    const currentScanProgressBar = document.getElementById('current-scan-progress-bar');
+    const scanResultsContainer = document.getElementById('scan-results-container');
+    const scanResultsBody = document.getElementById('scan-results-body');
+    
+    // Initialize the page
+    loadInterfaces();
+    loadScanHistory();
+    
+    // Event Listeners
+    scanForm.addEventListener('submit', startScan);
+    interfaceSelect.addEventListener('change', handleInterfaceChange);
+    rateLimitCheckbox.addEventListener('change', toggleRateLimit);
+    quickScanCheckbox.addEventListener('change', handleQuickScanChange);
+    cancelScanBtn.addEventListener('click', cancelScan);
+    viewResultsBtn.addEventListener('click', viewResults);
+    backToHistoryBtn.addEventListener('click', backToHistory);
+    exportJsonBtn.addEventListener('click', () => exportResults('json'));
+    exportCsvBtn.addEventListener('click', () => exportResults('csv'));
+    refreshHistoryBtn.addEventListener('click', loadScanHistory);
+    
+    // Tab navigation
+    scanTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const panelId = tab.getAttribute('data-panel');
+            
+            // Update active tab
+            scanTabs.forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            
+            // Update active panel
+            scanPanels.forEach(p => p.classList.remove('active'));
+            document.getElementById(panelId).classList.add('active');
+        });
+    });
+    
+    // Functions
+    function loadInterfaces() {
+        fetch('/api/scan/interfaces')
+            .then(response => response.json())
+            .then(data => {
+                interfaceSelect.innerHTML = '<option value="" selected disabled>Select interface...</option>';
+                
+                data.forEach(iface => {
+                    if (iface.state === 'UP' && iface.addr && iface.addr !== 'N/A') {
+                        const option = document.createElement('option');
+                        option.value = iface.name;
+                        option.setAttribute('data-addr', iface.addr.split('/')[0]);
+                        option.textContent = `${iface.name} (${iface.addr})`;
+                        interfaceSelect.appendChild(option);
+                    }
+                });
+            })
+            .catch(error => {
+                console.error('Error loading interfaces:', error);
+                showMessage('Error loading network interfaces. Please refresh the page.', 'error');
+            });
+    }
+    
+    function handleInterfaceChange() {
+        const selectedOption = interfaceSelect.options[interfaceSelect.selectedIndex];
+        if (selectedOption && selectedOption.getAttribute('data-addr')) {
+            const ipAddr = selectedOption.getAttribute('data-addr');
+            const ipParts = ipAddr.split('.');
+            const subnetPrefix = ipParts.slice(0, 3).join('.');
+            targetRangeInput.value = `${subnetPrefix}.0/24`;
+        }
+    }
+    
+    function toggleRateLimit() {
+        rateLimitDelayInput.disabled = !rateLimitCheckbox.checked;
+    }
+    
+    function handleQuickScanChange() {
+        const isQuickScan = quickScanCheckbox.checked;
+        
+        // Adjust timeout for quick scan
+        if (isQuickScan) {
+            timeoutInput.value = "0.2";  // Set a faster timeout for quick scan
+            
+            // Disable options not needed for quick scan
+            getMacCheckbox.checked = false;
+            getHostnameCheckbox.checked = false;
+            getHostTypeCheckbox.checked = false;
+        } else {
+            timeoutInput.value = "1.0";  // Reset to default timeout
+            
+            // Re-enable typical options
+            getMacCheckbox.checked = true;
+            getHostnameCheckbox.checked = true;
+            getHostTypeCheckbox.checked = true;
+        }
+    }
+    
+    function startScan(event) {
+        event.preventDefault();
+        
+        const targetRange = targetRangeInput.value.trim();
+        if (!targetRange) {
+            showMessage('Please enter a target range', 'error');
+            return;
+        }
+        
+        const scanOptions = {
+            timeout: parseFloat(timeoutInput.value),
+            rate_limit: rateLimitCheckbox.checked,
+            rate_limit_delay: parseFloat(rateLimitDelayInput.value),
+            get_mac: getMacCheckbox.checked,
+            get_hostname: getHostnameCheckbox.checked,
+            get_host_type: getHostTypeCheckbox.checked,
+            quick_scan: quickScanCheckbox.checked
+        };
+        
+        const scanData = {
+            target_range: targetRange,
+            name: scanNameInput.value || null,
+            options: scanOptions
+        };
+        
+        startScanBtn.disabled = true;
+        startScanBtn.textContent = 'Starting...';
+        
+        fetch('/api/scan/start', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(scanData)
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                activeScanId = data.scan_id;
+                
+                // Update UI
+                currentScanName.textContent = data.name || 'Scan in Progress';
+                currentScanStatusText.textContent = 'Running';
+                currentScanStatusText.className = 'status-badge running';
+                currentScanProgressText.textContent = '0%';
+                currentScanHosts.textContent = '0/0';
+                currentScanDiscovered.textContent = '0';
+                currentScanProgressBar.style.width = '0%';
+                currentScanProgressBar.textContent = '0%';
+                
+                // Show the current scan tab and panel
+                scanTabs.forEach(t => {
+                    if (t.getAttribute('data-panel') === 'current-scan') {
+                        t.style.display = 'block';
+                        t.click();
+                    }
+                });
+                
+                // Start polling for updates
+                startScanPolling(data.scan_id);
+                
+                showMessage(`Scan started: ${data.name || 'Unnamed scan'}`, 'success');
+            } else {
+                showMessage(`Failed to start scan: ${data.message}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error starting scan:', error);
+            showMessage('Error starting scan. Please try again.', 'error');
+        })
+        .finally(() => {
+            startScanBtn.disabled = false;
+            startScanBtn.textContent = 'Start Scan';
+        });
+    }
+    
+    function startScanPolling(scanId) {
+        // Clear any existing interval
+        if (activeScanInterval) {
+            clearInterval(activeScanInterval);
+        }
+        
+        // Set up polling
+        activeScanInterval = setInterval(() => {
+            fetchScanStatus(scanId);
+        }, 1000);
+    }
+    
+    function fetchScanStatus(scanId) {
+        fetch(`/api/scan/status/${scanId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateScanStatus(data);
+                    
+                    // If scan is complete, stop polling
+                    if (!data.active && ['completed', 'cancelled', 'error'].includes(data.status)) {
+                        if (activeScanInterval) {
+                            clearInterval(activeScanInterval);
+                            activeScanInterval = null;
+                        }
+                        
+                        // Reload scan history
+                        loadScanHistory();
+                    }
+                } else {
+                    console.error('Error fetching scan status:', data.message);
+                    if (activeScanInterval) {
+                        clearInterval(activeScanInterval);
+                        activeScanInterval = null;
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('Error polling scan status:', error);
+            });
+    }
+    
+    function updateScanStatus(data) {
+        // Update progress info
+        currentScanProgressText.textContent = `${data.progress}%`;
+        currentScanHosts.textContent = `${data.scanned_hosts}/${data.total_hosts}`;
+        currentScanDiscovered.textContent = data.result_count;
+        currentScanProgressBar.style.width = `${data.progress}%`;
+        currentScanProgressBar.textContent = `${data.progress}%`;
+        
+        // Update status badge
+        currentScanStatusText.textContent = data.status.charAt(0).toUpperCase() + data.status.slice(1);
+        currentScanStatusText.className = `status-badge ${data.status}`;
+        
+        // If scan is complete, update the UI
+        if (['completed', 'cancelled', 'error'].includes(data.status)) {
+            cancelScanBtn.style.display = 'none';
+            backToHistoryBtn.style.display = 'inline-block';
+        } else {
+            cancelScanBtn.style.display = 'inline-block';
+            backToHistoryBtn.style.display = 'none';
+        }
+    }
+    
+    function cancelScan() {
+        if (!activeScanId) return;
+        
+        cancelScanBtn.disabled = true;
+        cancelScanBtn.textContent = 'Cancelling...';
+        
+        fetch(`/api/scan/cancel/${activeScanId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage('Scan cancelled', 'info');
+                
+                // Update UI
+                currentScanStatusText.textContent = 'Cancelled';
+                currentScanStatusText.className = 'status-badge cancelled';
+                
+                if (activeScanInterval) {
+                    clearInterval(activeScanInterval);
+                    activeScanInterval = null;
+                }
+                
+                // Reload scan history
+                loadScanHistory();
+            } else {
+                showMessage(`Failed to cancel scan: ${data.message}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error cancelling scan:', error);
+            showMessage('Error cancelling scan', 'error');
+        })
+        .finally(() => {
+            cancelScanBtn.disabled = false;
+            cancelScanBtn.textContent = 'Cancel Scan';
+        });
+    }
+    
+    function viewResults() {
+        if (!activeScanId) return;
+        
+        viewResultsBtn.disabled = true;
+        viewResultsBtn.textContent = 'Loading...';
+        
+        fetch(`/api/scan/results/${activeScanId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Store the results for export
+                    currentResults = data.results;
+                    
+                    // Clear previous results
+                    scanResultsBody.innerHTML = '';
+                    
+                    // Populate table with results
+                    const results = data.results.results || [];
+                    results.forEach(host => {
+                        if (!host || host.status !== 'up') return;
+                        
+                        const row = document.createElement('tr');
+                        row.className = 'host-up';
+                        
+                        row.innerHTML = `
+                            <td>${host.ip}</td>
+                            <td>${host.status}</td>
+                            <td>${host.mac || '-'}</td>
+                            <td>${host.hostname || '-'}</td>
+                            <td>${host.host_type || '-'}</td>
+                            <td>${host.response_time ? host.response_time + ' ms' : '-'}</td>
+                        `;
+                        
+                        scanResultsBody.appendChild(row);
+                    });
+                    
+                    // Show no results message if needed
+                    if (scanResultsBody.childElementCount === 0) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = '<td colspan="6" class="text-center">No hosts discovered</td>';
+                        scanResultsBody.appendChild(row);
+                    }
+                    
+                    // Show results container
+                    scanResultsContainer.style.display = 'block';
+                } else {
+                    showMessage(`Failed to load results: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading results:', error);
+                showMessage('Error loading scan results', 'error');
+            })
+            .finally(() => {
+                viewResultsBtn.disabled = false;
+                viewResultsBtn.textContent = 'View Results';
+            });
+    }
+    
+    function loadScanHistory() {
+        scanHistoryLoading.style.display = 'block';
+        scanHistoryList.innerHTML = '';
+        
+        fetch('/api/scan/list')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const scans = data.scans;
+                    
+                    if (scans.length === 0) {
+                        scanHistoryList.innerHTML = '<p class="text-center">No scan history found</p>';
+                    } else {
+                        scans.forEach(scan => {
+                            const scanItem = document.createElement('div');
+                            scanItem.className = 'scan-list-item';
+                            
+                            // Format dates
+                            const startDate = new Date(scan.start_time);
+                            const startDateFormatted = startDate.toLocaleString();
+                            
+                            scanItem.innerHTML = `
+                                <div class="scan-item-details">
+                                    <h3>${scan.name || 'Unnamed Scan'}</h3>
+                                    <p>Started: ${startDateFormatted}</p>
+                                    <p>Status: <span class="status-badge ${scan.status}">${scan.status.charAt(0).toUpperCase() + scan.status.slice(1)}</span></p>
+                                    <p>Hosts: ${scan.result_count} found of ${scan.scanned_hosts} scanned</p>
+                                </div>
+                                <div class="scan-item-actions">
+                                    <button class="btn primary btn-sm view-scan-btn" data-id="${scan.scan_id}">View</button>
+                                    <button class="btn secondary btn-sm rename-scan-btn" data-id="${scan.scan_id}">Rename</button>
+                                    <button class="btn danger btn-sm delete-scan-btn" data-id="${scan.scan_id}">Delete</button>
+                                </div>
+                            `;
+                            
+                            scanHistoryList.appendChild(scanItem);
+                            
+                            // Add event listeners to the buttons
+                            scanItem.querySelector('.view-scan-btn').addEventListener('click', () => {
+                                activeScanId = scan.scan_id;
+                                viewHistoricalScan(scan.scan_id);
+                            });
+                            
+                            scanItem.querySelector('.rename-scan-btn').addEventListener('click', () => {
+                                promptRenameScan(scan.scan_id, scan.name || 'Unnamed Scan');
+                            });
+                            
+                            scanItem.querySelector('.delete-scan-btn').addEventListener('click', () => {
+                                confirmDeleteScan(scan.scan_id, scan.name || 'Unnamed Scan');
+                            });
+                        });
+                    }
+                } else {
+                    scanHistoryList.innerHTML = '<p class="text-center text-error">Error loading scan history</p>';
+                }
+            })
+            .catch(error => {
+                console.error('Error loading scan history:', error);
+                scanHistoryList.innerHTML = '<p class="text-center text-error">Error loading scan history</p>';
+            })
+            .finally(() => {
+                scanHistoryLoading.style.display = 'none';
+            });
+    }
+    
+    function viewHistoricalScan(scanId) {
+        fetch(`/api/scan/results/${scanId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Store the results for export
+                    currentResults = data.results;
+                    
+                    // Update the current scan panel with the historical scan details
+                    const scan = data.results;
+                    currentScanName.textContent = scan.name || 'Unnamed Scan';
+                    currentScanStatusText.textContent = scan.status.charAt(0).toUpperCase() + scan.status.slice(1);
+                    currentScanStatusText.className = `status-badge ${scan.status}`;
+                    currentScanProgressText.textContent = '100%';
+                    currentScanHosts.textContent = `${scan.scanned_hosts}/${scan.total_hosts}`;
+                    currentScanDiscovered.textContent = scan.results ? scan.results.length : 0;
+                    currentScanProgressBar.style.width = '100%';
+                    currentScanProgressBar.textContent = '100%';
+                    
+                    // Update buttons
+                    cancelScanBtn.style.display = 'none';
+                    backToHistoryBtn.style.display = 'inline-block';
+                    
+                    // Clear previous results
+                    scanResultsBody.innerHTML = '';
+                    
+                    // Populate table with results
+                    const results = scan.results || [];
+                    results.forEach(host => {
+                        if (!host || host.status !== 'up') return;
+                        
+                        const row = document.createElement('tr');
+                        row.className = 'host-up';
+                        
+                        row.innerHTML = `
+                            <td>${host.ip}</td>
+                            <td>${host.status}</td>
+                            <td>${host.mac || '-'}</td>
+                            <td>${host.hostname || '-'}</td>
+                            <td>${host.host_type || '-'}</td>
+                            <td>${host.response_time ? host.response_time + ' ms' : '-'}</td>
+                        `;
+                        
+                        scanResultsBody.appendChild(row);
+                    });
+                    
+                    // Show no results message if needed
+                    if (scanResultsBody.childElementCount === 0) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = '<td colspan="6" class="text-center">No hosts discovered</td>';
+                        scanResultsBody.appendChild(row);
+                    }
+                    
+                    // Show results container
+                    scanResultsContainer.style.display = 'block';
+                    
+                    // Switch to current scan tab
+                    scanTabs.forEach(t => {
+                        if (t.getAttribute('data-panel') === 'current-scan') {
+                            t.style.display = 'block';
+                            t.click();
+                        }
+                    });
+                } else {
+                    showMessage(`Failed to load scan: ${data.message}`, 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error loading scan:', error);
+                showMessage('Error loading scan details', 'error');
+            });
+    }
+    
+    function backToHistory() {
+        // Hide results container
+        scanResultsContainer.style.display = 'none';
+        
+        // Switch to history tab
+        scanTabs.forEach(t => {
+            if (t.getAttribute('data-panel') === 'scan-history') {
+                t.click();
+            }
+        });
+    }
+    
+    function promptRenameScan(scanId, currentName) {
+        const newName = prompt('Enter new name for the scan:', currentName);
+        if (newName !== null && newName.trim() !== '') {
+            renameScan(scanId, newName.trim());
+        }
+    }
+    
+    function renameScan(scanId, newName) {
+        fetch(`/api/scan/rename/${scanId}`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ name: newName })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage('Scan renamed successfully', 'success');
+                loadScanHistory();
+            } else {
+                showMessage(`Failed to rename scan: ${data.message}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error renaming scan:', error);
+            showMessage('Error renaming scan', 'error');
+        });
+    }
+    
+    function confirmDeleteScan(scanId, scanName) {
+        if (confirm(`Are you sure you want to delete the scan "${scanName}"?`)) {
+            deleteScan(scanId);
+        }
+    }
+    
+    function deleteScan(scanId) {
+        fetch(`/api/scan/delete/${scanId}`, {
+            method: 'POST'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showMessage('Scan deleted successfully', 'success');
+                loadScanHistory();
+            } else {
+                showMessage(`Failed to delete scan: ${data.message}`, 'error');
+            }
+        })
+        .catch(error => {
+            console.error('Error deleting scan:', error);
+            showMessage('Error deleting scan', 'error');
+        });
+    }
+    
+    function exportResults(format) {
+        if (!activeScanId) return;
+        
+        window.location.href = `/api/scan/export/${activeScanId}?format=${format}`;
+    }
+    
+    function showMessage(message, type) {
+        const statusMessage = document.getElementById('status-message');
+        statusMessage.textContent = message;
+        statusMessage.className = `status-bar ${type}`;
+        statusMessage.style.display = 'block';
+        
+        setTimeout(() => {
+            statusMessage.style.display = 'none';
+        }, 5000);
+    }
+});
+</script>
+{% endblock %} 

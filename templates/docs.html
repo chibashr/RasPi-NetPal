@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Documentation{% endblock %}
+{% block nav_docs %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .docs-container {
+        display: flex;
+        gap: 20px;
+    }
+    
+    .docs-sidebar {
+        flex: 0 0 200px;
+        padding: 10px;
+        background-color: var(--card-bg-color);
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .docs-content {
+        flex: 1;
+        padding: 20px;
+        background-color: var(--card-bg-color);
+        border-radius: 5px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .docs-sidebar ul {
+        list-style-type: none;
+        padding: 0;
+        margin: 0;
+    }
+    
+    .docs-sidebar li {
+        margin-bottom: 10px;
+    }
+    
+    .docs-sidebar a {
+        display: block;
+        padding: 8px;
+        text-decoration: none;
+        border-radius: 4px;
+        color: var(--text-color);
+        border-left: 3px solid transparent;
+    }
+    
+    .docs-sidebar a:hover {
+        background-color: var(--hover-color);
+    }
+    
+    .docs-sidebar a.active {
+        background-color: var(--primary-color-light, rgba(0, 128, 0, 0.1));
+        border-left: 3px solid var(--primary-color, #4CAF50);
+        font-weight: bold;
+        color: var(--primary-color, #4CAF50);
+    }
+    
+    .docs-content pre {
+        background-color: var(--code-bg-color);
+        padding: 15px;
+        border-radius: 5px;
+        overflow-x: auto;
+    }
+    
+    .docs-content code {
+        font-family: monospace;
+        background-color: var(--code-bg-color);
+        padding: 2px 4px;
+        border-radius: 3px;
+    }
+    
+    .docs-content img {
+        max-width: 100%;
+    }
+    
+    .docs-content table {
+        border-collapse: collapse;
+        width: 100%;
+        margin: 15px 0;
+    }
+    
+    .docs-content th, .docs-content td {
+        border: 1px solid var(--border-color);
+        padding: 8px 12px;
+        text-align: left;
+    }
+    
+    .docs-content th {
+        background-color: var(--table-header-bg);
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Documentation</h2>
+    
+    <div class="docs-container">
+        <div class="docs-sidebar">
+            <ul>
+                <li><a href="{{ url_for('docs.show_doc', doc_name='index') }}" {% if doc_name.lower() == 'index' or doc_name.lower() == 'readme' %}class="active"{% endif %}>Overview</a></li>
+                <li><a href="{{ url_for('docs.show_doc', doc_name='architecture') }}" {% if doc_name.lower() == 'architecture' %}class="active"{% endif %}>Architecture</a></li>
+                <li><a href="{{ url_for('docs.show_doc', doc_name='components') }}" {% if doc_name.lower() == 'components' %}class="active"{% endif %}>Components</a></li>
+                <li><a href="{{ url_for('docs.show_doc', doc_name='installation') }}" {% if doc_name.lower() == 'installation' %}class="active"{% endif %}>Installation</a></li>
+                <li><a href="{{ url_for('docs.show_doc', doc_name='usage') }}" {% if doc_name.lower() == 'usage' %}class="active"{% endif %}>Usage Guide</a></li>
+                <li><a href="{{ url_for('docs.show_doc', doc_name='changelog') }}" {% if doc_name.lower() == 'changelog' %}class="active"{% endif %}>Changelog</a></li>
+                <li><a href="{{ url_for('docs.show_doc', doc_name='about') }}" {% if doc_name.lower() == 'about' %}class="active"{% endif %}>About</a></li>
+            </ul>
+        </div>
+        
+        <div class="docs-content">
+            {{ content|safe }}
+        </div>
+    </div>
+</div>
+{% endblock %} 

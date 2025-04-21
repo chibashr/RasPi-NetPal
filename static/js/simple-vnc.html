@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Simple VNC Viewer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #111;
+            color: white;
+            font-family: sans-serif;
+        }
+        iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- Use iframe to load the NoVNC viewer directly -->
+    <iframe id="vnc-frame" src="/static/novnc/vnc_lite.html"></iframe>
+
+    <script>
+        // Update URL parameters after iframe loads
+        window.addEventListener('load', function() {
+            const iframe = document.getElementById('vnc-frame');
+            const iframeWindow = iframe.contentWindow;
+
+            // Try to find the variable that holds the connection info
+            setTimeout(function() {
+                try {
+                    // For vnc_lite.html - directly set the WebSocket URL
+                    // This avoids host parameter issues by directly setting the connection URL
+                    const wsUrl = 'ws://localhost:6080';
+                    
+                    if (iframeWindow.connect && typeof iframeWindow.connect === 'function') {
+                        console.log("Attempting to call connect function");
+                        iframeWindow.connect(wsUrl);
+                    } else if (iframeWindow.rfb) {
+                        console.log("Found RFB object, updating connection");
+                        const rfb = iframeWindow.rfb;
+                        if (!rfb._websocket || rfb._websocket.readyState > 1) {
+                            // Reconnect with the correct URL
+                            rfb.disconnect();
+                            rfb._url = wsUrl;
+                            rfb.connect();
+                        }
+                    } else {
+                        console.log("Could not find a way to update VNC connection");
+                    }
+                } catch (err) {
+                    console.error("Error updating VNC connection:", err);
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html> 

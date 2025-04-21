@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Error - Raspberry Pi Network Control</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="main-container">
+        <div class="card">
+            <h1>Error</h1>
+            <div class="navigation-menu">
+                <a href="/" class="nav-link">Dashboard</a>
+                <a href="/capture" class="nav-link">Capture</a>
+                <a href="/tftp" class="nav-link">File Transfer</a>
+                <a href="/tools" class="nav-link">Tools</a>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="error-container">
+                <h2>An error occurred</h2>
+                <div class="status-bar error">
+                    {{ message }}
+                </div>
+                <div class="actions">
+                    <a href="javascript:history.back()" class="button">Go Back</a>
+                    <a href="/" class="button">Return to Dashboard</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <button id="dark-mode-toggle" class="dark-mode-toggle">🌙</button>
+    
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+</html> 

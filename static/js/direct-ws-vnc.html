@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Direct WebSocket VNC</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+            color: #fff;
+            font-family: Arial, sans-serif;
+        }
+        #status {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            background: rgba(0,0,0,0.8);
+            color: #fff;
+            text-align: center;
+            z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+    <div id="status">Connecting to VNC server...</div>
+    
+    <script>
+        // Load NoVNC scripts dynamically
+        function loadScript(src) {
+            return new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.type = 'text/javascript';
+                script.src = src;
+                script.onload = resolve;
+                script.onerror = reject;
+                document.head.appendChild(script);
+            });
+        }
+        
+        // Initialize VNC connection
+        async function initVNC() {
+            const statusEl = document.getElementById('status');
+            
+            try {
+                // Get hostname from window location instead of hardcoding
+                const hostname = window.location.hostname;
+                statusEl.innerText = `Connecting to ${hostname}:6080`;
+                
+                // Create VNC frame directly
+                const frame = document.createElement('iframe');
+                frame.style.width = '100%';
+                frame.style.height = '100%';
+                frame.style.border = 'none';
+                
+                // Use direct WebSocket URL to avoid path issues
+                frame.src = `/static/novnc/vnc_lite.html?host=${hostname}&port=6080&path=&autoconnect=true&resize=scale`;
+                
+                document.body.appendChild(frame);
+                
+                // Hide status after a while
+                setTimeout(() => {
+                    statusEl.style.opacity = '0.7';
+                }, 3000);
+                
+                // Add message about direct connection
+                setTimeout(() => {
+                    statusEl.innerText += ' - If connection fails, try connecting manually using your preferred VNC client.';
+                }, 5000);
+            } catch (error) {
+                statusEl.innerText = `Error: ${error.message}`;
+                console.error('VNC connection error:', error);
+            }
+        }
+        
+        // Start connection when page loads
+        window.addEventListener('load', initVNC);
+    </script>
+</body>
+</html> 
