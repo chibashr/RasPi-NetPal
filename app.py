@@ -172,6 +172,13 @@ try:
 except ImportError:
     app.logger.warning("Documentation routes not found")
 
+# Register issues API blueprint
+try:
+    from routes.issues import bp as issues_bp
+    app.register_blueprint(issues_bp)
+except ImportError:
+    app.logger.warning("Issue API routes not found")
+
 # Helper function to handle cd command specially
 def handle_cd_command(session_id, command):
     parts = command.split(None, 1)

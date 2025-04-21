@@ -8,37 +8,81 @@
       "version": "1.0.5",
       "date": "2025-04-21",
       "changes": [
+        "Added server-side issue storage to share issues across all sessions and interfaces",
+        "Improved offline synchronization with automatic sync when going online",
+        "Enhanced issue management with centralized tracking"
+      ]
+    },
+    {
+      "version": "1.0.4",
+      "date": "2025-04-21",
+      "changes": [
+        "Improved Report Issue button styling for a more streamlined look",
+        "Enhanced offline detection to properly queue issues without redirect attempts",
+        "Added connectivity checks before GitHub submission"
+      ]
+    },
+    {
+      "version": "1.0.3",
+      "date": "2025-04-21",
+      "changes": [
+        "Improved GitHub issue submission with direct form pre-filling",
+        "Moved Report Issue button to main header for better visibility",
+        "Enhanced offline issue tracking and submission"
+      ]
+    },
+    {
+      "version": "1.0.2",
+      "date": "2025-04-21",
+      "changes": [
+        "Added offline issue reporting system with local queue",
+        "Enhanced navigation bar for better mobile experience",
+        "Improved Report Issue button styling"
+      ]
+    },
+    {
+      "version": "1.0.1",
+      "date": "2025-04-21",
+      "changes": [
+        "Added offline fallback for documentation rendering",
+        "Added GitHub issue reporting link in navigation menu"
+      ]
+    },
+    {
+      "version": "1.0.0",
+      "date": "2025-04-16",
+      "changes": [
         "Added internet connectivity detection for network interfaces",
         "Network interfaces with internet access are now marked in the UI"
       ]
     },
     {
-      "version": "1.0.4",
-      "date": "2025-04-20",
+      "version": "0.0.4",
+      "date": "2025-04-16",
       "changes": [
         "Added USB serial device detection and support",
         "Improved USB device discovery functionality"
       ]
     },
     {
-      "version": "1.0.3",
-      "date": "2025-04-19",
+      "version": "0.0.3",
+      "date": "2025-04-16",
       "changes": [
         "Added USB network interface detection and support",
         "Improved connection sharing with USB tethered devices"
       ]
     },
     {
-      "version": "1.0.2",
-      "date": "2025-04-18",
+      "version": "0.0.2",
+      "date": "2025-04-16",
       "changes": [
         "Fixed terminal cursor positioning",
         "Improved tab completion for files and filepaths"
       ]
     },
     {
-      "version": "1.0.1",
-      "date": "2025-04-17",
+      "version": "0.0.1",
+      "date": "2025-04-16",
       "changes": [
         "Added network scanning functionality",
         "Added ability to save and manage scan results",
@@ -46,7 +90,7 @@
       ]
     },
     {
-      "version": "1.0.0",
+      "version": "0.0.0",
       "date": "2025-04-16",
       "changes": [
         "Initial release",

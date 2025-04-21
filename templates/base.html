@@ -7,12 +7,19 @@
     {% block extra_css %}{% endblock %}
     <script src="{{ url_for('static', filename='js/jquery.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/common.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/offline-issues.js') }}"></script>
     {% block extra_js %}{% endblock %}
 </head>
 <body>
     <div class="main-container">
         <div class="card">
-            <h1>Connected to {{ request.host.split(':')[0] }}</h1>
+            <div class="header-container">
+                <h1>Connected to {{ request.host.split(':')[0] }}</h1>
+                <a href="#" id="report-issue-btn" class="button button-primary report-button">
+                    Report Issue
+                    <span id="offline-issues-badge">0</span>
+                </a>
+            </div>
             <div class="flex-space-between">
                 <span id="pending-operations" class="status-bar info" style="display: none;"></span>
                 <div class="flex-row">
@@ -39,8 +46,66 @@
                 <path d="M6 .278a.768.768 0 0 1 .08.858 7.208 7.208 0 0 0-.878 3.46c0 4.021 3.278 7.277 7.318 7.277.527 0 1.04-.055 1.533-.16a.787.787 0 0 1 .81.316.733.733 0 0 1-.031.893A8.349 8.349 0 0 1 8.344 16C3.734 16 0 12.286 0 7.71 0 4.266 2.114 1.312 5.124.06A.752.752 0 0 1 6 .278z"/>
             </svg>
         </button>
+        
+        <!-- Issue Reporting Modal -->
+        <div id="issue-modal" class="modal">
+            <div class="issue-modal-content">
+                <div class="issue-modal-header">
+                    <h3>Report an Issue</h3>
+                    <span id="close-issue-modal" class="close">&times;</span>
+                </div>
+                <div class="issue-modal-body">
+                    <div class="issue-tabs">
+                        <button id="report-tab" class="issue-tab active" data-view="report">Report New Issue</button>
+                        <button id="manage-tab" class="issue-tab" data-view="manage">Manage Issues</button>
+                    </div>
+                    
+                    <div id="issue-report-view">
+                        <p>Submit a new issue report. Your report will be saved locally and submitted when online.</p>
+                        <div class="issue-form">
+                            <label for="issue-title">Issue Title</label>
+                            <input type="text" id="issue-title" placeholder="Brief description of the issue">
+                            
+                            <label for="issue-type">Issue Type</label>
+                            <select id="issue-type">
+                                <option value="bug">Bug</option>
+                                <option value="feature">Feature Request</option>
+                                <option value="question">Question</option>
+                                <option value="documentation">Documentation</option>
+                            </select>
+                            
+                            <label for="issue-description">Description</label>
+                            <textarea id="issue-description" placeholder="Please provide details about the issue..."></textarea>
+                        </div>
+                    </div>
+                    
+                    <div id="issue-manage-view" style="display: none;">
+                        <p>Manage your offline issue reports. These will be submitted when you're back online.</p>
+                        <div id="issue-list" class="issue-list">
+                            <!-- Issue list will be populated dynamically -->
+                        </div>
+                    </div>
+                </div>
+                <div class="issue-modal-footer">
+                    <button class="button" id="submit-issue">Save Issue</button>
+                    <button class="button button-secondary" id="close-issue-modal-btn">Close</button>
+                </div>
+            </div>
+        </div>
     </div>
     
     {% block scripts %}{% endblock %}
+    
+    <script>
+        // Initialize everything when the DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            initDarkMode();
+            updateLastUpdateTime();
+            initTabs();
+            
+            // Set up close modal button
+            document.getElementById('close-issue-modal-btn').addEventListener('click', closeIssueModal);
+        });
+    </script>
 </body>
 </html> 

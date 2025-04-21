@@ -13,6 +13,29 @@ except ImportError:
     MARKDOWN_AVAILABLE = False
     print("Markdown package not available. Documentation will be displayed as raw text.")
 
+# Add a local fallback version of markdown if the library is not available
+if not MARKDOWN_AVAILABLE:
+    def simple_markdown_to_html(md_text):
+        """Simple markdown conversion for offline fallback"""
+        html = md_text
+        # Convert headers
+        html = re.sub(r'^# (.*?)$', r'<h1>\1</h1>', html, flags=re.MULTILINE)
+        html = re.sub(r'^## (.*?)$', r'<h2>\1</h2>', html, flags=re.MULTILINE)
+        html = re.sub(r'^### (.*?)$', r'<h3>\1</h3>', html, flags=re.MULTILINE)
+        # Convert links
+        html = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', html)
+        # Convert code blocks
+        html = re.sub(r'```(.*?)```', r'<pre><code>\1</code></pre>', html, flags=re.DOTALL)
+        # Convert inline code
+        html = re.sub(r'`(.*?)`', r'<code>\1</code>', html)
+        # Convert paragraphs (simple approach)
+        html = '<p>' + html.replace('\n\n', '</p><p>') + '</p>'
+        # Fix any broken tags from the paragraph conversion
+        html = html.replace('<p><h', '<h').replace('</h1></p>', '</h1>')
+        html = html.replace('</h2></p>', '</h2>').replace('</h3></p>', '</h3>')
+        html = html.replace('<p><pre>', '<pre>').replace('</pre></p>', '</pre>')
+        return html
+
 bp = Blueprint('docs', __name__, url_prefix='/docs')
 
 # Documentation files mapping
@@ -151,7 +174,28 @@ def show_doc(doc_name):
         except Exception as e:
             html_content = f"<pre>Error rendering markdown: {str(e)}\n\n{md_content}</pre>"
     else:
-        html_content = f"<pre>{md_content}</pre>"
+        try:
+            # Process links first
+            def replace_md_links(match):
+                link_text = match.group(1)
+                link_target = match.group(2).lower()
+                
+                # If it's a markdown file, convert to route
+                if link_target.endswith('.md'):
+                    base_name = os.path.basename(link_target)
+                    if base_name.lower() in MD_TO_ROUTE:
+                        route_name = MD_TO_ROUTE[base_name.lower()]
+                        return f'[{link_text}]({url_for("docs.show_doc", doc_name=route_name)})'
+                
+                return match.group(0)
+            
+            # Replace markdown links
+            md_content = re.sub(r'\[(.*?)\]\((.*?\.md)\)', replace_md_links, md_content)
+            
+            # Use our simple fallback conversion
+            html_content = simple_markdown_to_html(md_content)
+        except Exception as e:
+            html_content = f"<pre>{md_content}</pre>"
     
     return render_template(
         'docs.html',
