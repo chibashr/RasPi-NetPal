@@ -1,0 +1,1 @@
+ACTION=="add", SUBSYSTEM=="net", SUBSYSTEMS=="usb", RUN+="/bin/chmod +x /opt/captive/scripts/usb-network-initialize.sh", RUN+="/opt/captive/scripts/usb-network-initialize.sh %k" 

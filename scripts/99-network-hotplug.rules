@@ -1,0 +1,15 @@
+# udev rules for automatic network interface hotplug detection
+# This rule triggers when a network interface carrier is detected (cable plugged in)
+
+# Rule for Ethernet interfaces - trigger when carrier is detected
+SUBSYSTEM=="net", ACTION=="change", KERNEL=="eth*", ATTR{carrier}=="1", RUN+="/opt/captive/scripts/handle-network-hotplug.sh %k up"
+
+# Rule for USB network interfaces - trigger when carrier is detected  
+SUBSYSTEM=="net", ACTION=="change", KERNEL=="usb*", ATTR{carrier}=="1", RUN+="/opt/captive/scripts/handle-network-hotplug.sh %k up"
+
+# Rule for when interfaces lose carrier (cable unplugged)
+SUBSYSTEM=="net", ACTION=="change", KERNEL=="eth*", ATTR{carrier}=="0", RUN+="/opt/captive/scripts/handle-network-hotplug.sh %k down"
+SUBSYSTEM=="net", ACTION=="change", KERNEL=="usb*", ATTR{carrier}=="0", RUN+="/opt/captive/scripts/handle-network-hotplug.sh %k down"
+
+# Rule for new USB network interfaces being added
+SUBSYSTEM=="net", ACTION=="add", KERNEL=="usb*", RUN+="/opt/captive/scripts/handle-network-hotplug.sh %k add" 

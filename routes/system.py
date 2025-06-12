@@ -6,7 +6,7 @@ import re
 
 # Import modules with try-except to catch import errors
 try:
-    from modules.system import get_usb_info, get_service_status, restart_service, test_serial_device
+    from modules.system import get_usb_info, get_service_status, restart_service, test_serial_device, get_service_details
 except ImportError as e:
     print(f"Error importing system module: {e}")
     # Fallback functions
@@ -586,6 +586,21 @@ def service_restart(service):
     }
     
     return jsonify(updated_data)
+
+@bp.route("/get_service_details/<service>", methods=["GET"])
+def service_details(service):
+    """Get detailed information about a specific service"""
+    try:
+        details = get_service_details(service)
+        return jsonify({
+            'success': True,
+            'service': details
+        })
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        })
 
 @bp.route("/get_storage_info", methods=["GET"])
 def storage_info():

@@ -1,6 +1,6 @@
 # Routes module initialization
 try:
-    from routes import network, system, capture, tftp, tools, control, docs
+    from routes import network, system, capture, tftp, tools, control, docs, anydesk
 except ImportError as e:
     print(f"Error importing route modules: {e}")
     # Import individual modules that do exist
@@ -30,6 +30,10 @@ except ImportError as e:
         pass
     try:
         from routes import control
+    except ImportError:
+        pass
+    try:
+        from routes import anydesk
     except ImportError:
         pass
 

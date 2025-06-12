@@ -1,0 +1,128 @@
+/* Gateway selector in interface details */
+.gateway-selector {
+    display: flex;
+    flex-direction: column;
+    margin-top: 5px;
+}
+
+.current-gateway {
+    font-weight: bold;
+}
+
+.gateway-actions {
+    display: flex;
+    align-items: center;
+    margin-top: 5px;
+}
+
+.gateway-select {
+    margin-right: 10px;
+    padding: 4px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+}
+
+.recovery-actions {
+    margin-top: 15px;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border-left: 3px solid #ffc107;
+}
+
+.recovery-actions h5 {
+    margin-top: 0;
+    margin-bottom: 10px;
+    color: #5a5a5a;
+}
+
+.recovery-actions button {
+    margin-right: 8px;
+    margin-bottom: 5px;
+}
+
+.button-warning {
+    background-color: #ffc107;
+    color: #212529;
+}
+
+.button-warning:hover {
+    background-color: #e0a800;
+}
+
+/* Add a pulsing effect for DOWN interfaces that are connected */
+@keyframes pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { opacity: 0.7; }
+}
+
+.badge-warning[title*="physically connected"] {
+    animation: pulse 2s infinite;
+    cursor: help;
+}
+
+#gateway-dns-fields {
+    padding-top: 10px;
+    margin-top: 5px;
+    border-top: 1px solid #eee;
+}
+
+.dark-mode #gateway-dns-fields {
+    border-top-color: #333;
+}
+
+.form-help {
+    margin-top: 3px;
+    font-size: 0.85em;
+    color: #666;
+}
+
+.dark-mode .form-help {
+    color: #aaa;
+}
+
+.dhcp-info-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.dhcp-info-table td {
+    padding: 5px;
+    border-bottom: 1px solid #eee;
+}
+
+.dark-mode .dhcp-info-table td {
+    border-bottom-color: #333;
+}
+
+.dhcp-info-table td:first-child {
+    font-weight: bold;
+    width: 40%;
+}
+
+.dhcp-override-heading {
+    font-weight: bold;
+    margin-top: 10px;
+    padding-top: 10px;
+    color: #0066cc;
+    border-top: 1px dashed #ccc;
+}
+
+.dark-mode .dhcp-override-heading {
+    color: #4d94ff;
+    border-top-color: #444;
+}
+
+.override-value {
+    color: #0066cc;
+    font-weight: bold;
+}
+
+.dark-mode .override-value {
+    color: #4d94ff;
+}
+
+.warning {
+    color: #ff9800;
+} 

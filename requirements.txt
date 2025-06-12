@@ -5,3 +5,5 @@ gunicorn
 markdown
 requests
 numpy 
+pyserial
+paramiko 

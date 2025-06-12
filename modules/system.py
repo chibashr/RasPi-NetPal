@@ -55,7 +55,9 @@ def get_available_services():
         'dnsmasq', 
         'hostapd',
         'nginx',
-        'apache2'
+        'apache2',
+        'anydesk',
+        'webpage'  # Our own service
     ]
     
     available_services = []
@@ -80,17 +82,90 @@ def get_service_status():
         try:
             status = subprocess.check_output(f"systemctl is-active {service_name}", shell=True).decode().strip()
             details = subprocess.check_output(f"systemctl status {service_name}", shell=True).decode().strip()
+            
+            # Get additional service information
+            try:
+                # Get service enabled status
+                enabled_status = subprocess.check_output(f"systemctl is-enabled {service_name}", shell=True).decode().strip()
+            except:
+                enabled_status = "unknown"
+                
+            # Get service uptime/memory info from status
+            memory_usage = "N/A"
+            pid = "N/A"
+            try:
+                # Extract PID and memory from status output
+                for line in details.split('\n'):
+                    if 'Main PID:' in line:
+                        pid = line.split('Main PID:')[1].split('(')[0].strip()
+                    elif 'Memory:' in line:
+                        memory_usage = line.split('Memory:')[1].strip()
+            except:
+                pass
+                
         except:
             status = "unknown"
             details = "Could not fetch details"
+            enabled_status = "unknown"
+            memory_usage = "N/A"
+            pid = "N/A"
             
         result.append({
             'name': service_name,
             'status': status,
-            'details': details
+            'details': details,
+            'enabled': enabled_status,
+            'memory': memory_usage,
+            'pid': pid
         })
         
     return result
+
+def get_service_details(service_name):
+    """Get detailed information about a specific service"""
+    try:
+        # Get basic status information
+        status = subprocess.check_output(f"systemctl is-active {service_name}", shell=True).decode().strip()
+        enabled = subprocess.check_output(f"systemctl is-enabled {service_name}", shell=True).decode().strip()
+        full_status = subprocess.check_output(f"systemctl status {service_name}", shell=True).decode().strip()
+        
+        # Get service unit file information
+        try:
+            unit_info = subprocess.check_output(f"systemctl show {service_name} --no-page", shell=True).decode().strip()
+        except:
+            unit_info = "Unit information unavailable"
+        
+        # Get recent logs
+        try:
+            logs = subprocess.check_output(f"journalctl -u {service_name} -n 20 --no-pager", shell=True).decode().strip()
+        except:
+            logs = "Logs unavailable"
+            
+        # Parse unit info for useful details
+        parsed_info = {}
+        for line in unit_info.split('\n'):
+            if '=' in line:
+                key, value = line.split('=', 1)
+                if key in ['ExecStart', 'ExecReload', 'ExecStop', 'User', 'Group', 'WorkingDirectory', 'Environment']:
+                    parsed_info[key] = value
+        
+        return {
+            'name': service_name,
+            'status': status,
+            'enabled': enabled,
+            'full_status': full_status,
+            'unit_info': parsed_info,
+            'logs': logs
+        }
+    except Exception as e:
+        return {
+            'name': service_name,
+            'status': 'unknown',
+            'enabled': 'unknown', 
+            'full_status': f'Error: {str(e)}',
+            'unit_info': {},
+            'logs': 'Error retrieving logs'
+        }
 
 def restart_service(service_name):
     try:

@@ -49,18 +49,29 @@ function toggleSection(id) {
 
 function toggleStaticFields() {
     const mode = document.getElementById('static').value;
-    const staticFields = document.getElementById('static-fields');
+    const staticIpFields = document.getElementById('static-ip-fields');
     const dhcpFields = document.getElementById('dhcp-fields');
+    const gatewayDnsFields = document.getElementById('gateway-dns-fields');
     const modeDescription = document.getElementById('mode-description');
     
     if (mode === 'yes') {
-        staticFields.style.display = 'block';
+        staticIpFields.style.display = 'block';
         dhcpFields.style.display = 'none';
+        gatewayDnsFields.style.display = 'block';
         modeDescription.textContent = 'Manual configuration with fixed IP address';
+        
+        // Change the description for gateway and DNS in static mode
+        document.getElementById('gateway-help').textContent = 'The default gateway for this interface';
+        document.getElementById('dns-help').textContent = 'Separate multiple DNS servers with spaces';
     } else {
-        staticFields.style.display = 'none';
+        staticIpFields.style.display = 'none';
         dhcpFields.style.display = 'block';
+        gatewayDnsFields.style.display = 'block';
         modeDescription.textContent = 'Automatic IP configuration via DHCP server';
+        
+        // Update the descriptions to make it clear these are overrides
+        document.getElementById('gateway-help').textContent = 'Override DHCP-provided gateway (optional)';
+        document.getElementById('dns-help').textContent = 'Override DHCP-provided DNS servers (optional)';
         
         // Load current DHCP info for the interface
         const iface = document.getElementById('iface-name').value;
@@ -75,7 +86,7 @@ function updateDhcpInfo(iface) {
     // Fetch current interface info
     fetch('/get_interface_config/' + iface)
         .then(response => response.json())
-        .then(data => {
+        .then(configData => {
             // Get general interface info from the interfaces list
             fetch('/get_updates')
                 .then(response => response.json())
@@ -84,21 +95,42 @@ function updateDhcpInfo(iface) {
                     if (ifaceInfo) {
                         let html = '<table class="dhcp-info-table">';
                         html += `<tr><td>Current IP:</td><td>${ifaceInfo.addr || 'Not assigned'}</td></tr>`;
-                        html += `<tr><td>Gateway:</td><td>${ifaceInfo.gateway || 'Not assigned'}</td></tr>`;
+                        html += `<tr><td>Gateway:</td><td class="${ifaceInfo.gateway === 'N/A' ? 'warning' : ''}">${ifaceInfo.gateway || 'Not assigned'}</td></tr>`;
                         
-                        // Try to extract more info from details (like DNS servers)
-                        let dnsServers = 'Unknown';
-                        if (ifaceInfo.details) {
-                            const dnsMatch = ifaceInfo.details.match(/domain\s+name\s+servers\s+([^\n]+)/i);
-                            if (dnsMatch) {
-                                dnsServers = dnsMatch[1].trim();
-                            }
-                        }
-                        
-                        html += `<tr><td>DNS Servers:</td><td>${dnsServers}</td></tr>`;
-                        html += '</table>';
-                        
-                        dhcpInfoBox.innerHTML = html;
+                        // Try to extract DNS servers
+                        fetch('/get_interface_details/' + iface)
+                            .then(response => response.json())
+                            .then(detailsData => {
+                                if (detailsData.success) {
+                                    const dnsServers = detailsData.details.dns || 'Not configured';
+                                    html += `<tr><td>DNS Servers:</td><td>${dnsServers}</td></tr>`;
+                                    
+                                    // Check for custom overrides
+                                    if (configData.gateway || configData.dns) {
+                                        html += '<tr><td colspan="2" class="dhcp-override-heading">Configured Overrides:</td></tr>';
+                                        
+                                        if (configData.gateway) {
+                                            html += `<tr><td>Gateway Override:</td><td class="override-value">${configData.gateway}</td></tr>`;
+                                        }
+                                        
+                                        if (configData.dns) {
+                                            html += `<tr><td>DNS Override:</td><td class="override-value">${configData.dns}</td></tr>`;
+                                        }
+                                    }
+                                    
+                                    html += '</table>';
+                                    dhcpInfoBox.innerHTML = html;
+                                } else {
+                                    // Fallback if interface details fail
+                                    html += '</table>';
+                                    dhcpInfoBox.innerHTML = html;
+                                }
+                            })
+                            .catch(error => {
+                                html += '</table>';
+                                dhcpInfoBox.innerHTML = html;
+                                console.error("Error fetching interface details:", error);
+                            });
                     } else {
                         dhcpInfoBox.innerHTML = '<p>Could not retrieve interface information</p>';
                     }
@@ -124,9 +156,7 @@ function renewDhcpFromForm() {
         
         // Update button state
         const button = document.querySelector('button[onclick="renewDhcpFromForm()"]');
-        const originalText = button.textContent;
-        button.innerHTML = 'Renewing... <span class="loading"></span>';
-        button.disabled = true;
+        const originalText = setButtonLoading(button, 'Renewing');
         
         fetch('/renew_dhcp/' + iface, {
             method: 'POST'
@@ -179,18 +209,41 @@ function showEditForm(iface) {
         .then(response => response.json())
         .then(data => {
             if (data.success) {
-                // Fill in form fields with data from detailed interface info
-                document.getElementById('ip').value = data.details.ip !== 'Not assigned' ? data.details.ip : '';
-                document.getElementById('netmask').value = data.details.netmask !== 'Unknown' ? data.details.netmask : '';
-                document.getElementById('gateway').value = data.details.gateway !== 'Not configured' ? data.details.gateway : '';
-                document.getElementById('dns').value = data.details.dns !== 'Not configured' ? data.details.dns : '';
-                document.getElementById('static').value = !data.details.is_dhcp ? 'yes' : 'no';
-                
-                // Apply visibility based on the selected mode
-                toggleStaticFields();
-                
-                // Hide status bar
-                statusBar.style.display = 'none';
+                // Also fetch interface config to get static/DHCP status and any custom overrides
+                fetch('/get_interface_config/' + iface)
+                    .then(response => response.json())
+                    .then(configData => {
+                        // Fill in form fields with data from detailed interface info
+                        document.getElementById('ip').value = data.details.ip !== 'Not assigned' ? data.details.ip : '';
+                        document.getElementById('netmask').value = data.details.netmask !== 'Unknown' ? data.details.netmask : '';
+                        
+                        // Set gateway and DNS values - prefer configured overrides if they exist
+                        document.getElementById('gateway').value = configData.gateway || 
+                            (data.details.gateway !== 'Not configured' ? data.details.gateway : '');
+                        
+                        document.getElementById('dns').value = configData.dns || 
+                            (data.details.dns !== 'Not configured' ? data.details.dns : '');
+                        
+                        document.getElementById('static').value = configData.static ? 'yes' : 'no';
+                        
+                        // Apply visibility based on the selected mode
+                        toggleStaticFields();
+                        
+                        // Hide status bar
+                        statusBar.style.display = 'none';
+                    })
+                    .catch(error => {
+                        console.error("Error fetching interface config:", error);
+                        // Fall back to setting values directly from interface details
+                        document.getElementById('ip').value = data.details.ip !== 'Not assigned' ? data.details.ip : '';
+                        document.getElementById('netmask').value = data.details.netmask !== 'Unknown' ? data.details.netmask : '';
+                        document.getElementById('gateway').value = data.details.gateway !== 'Not configured' ? data.details.gateway : '';
+                        document.getElementById('dns').value = data.details.dns !== 'Not configured' ? data.details.dns : '';
+                        document.getElementById('static').value = !data.details.is_dhcp ? 'yes' : 'no';
+                        
+                        toggleStaticFields();
+                        statusBar.style.display = 'none';
+                    });
             } else {
                 // Fallback to old method if detailed info retrieval fails
                 fallbackInterfaceConfig(iface, statusBar);
@@ -245,7 +298,7 @@ function createInterfaceEditForm() {
                     <p class="form-help" id="mode-description">Automatic IP configuration via DHCP server</p>
                 </div>
                 
-                <div id="static-fields" style="display: none;">
+                <div id="static-ip-fields" style="display: none;">
                     <div class="form-group">
                         <label for="ip">IP Address:</label>
                         <input type="text" id="ip" name="ip" placeholder="e.g. 192.168.1.100">
@@ -255,16 +308,20 @@ function createInterfaceEditForm() {
                         <label for="netmask">Subnet Mask:</label>
                         <input type="text" id="netmask" name="netmask" placeholder="e.g. 255.255.255.0">
                     </div>
-                    
+                </div>
+                
+                <!-- Gateway and DNS fields available in both modes -->
+                <div id="gateway-dns-fields">
                     <div class="form-group">
-                        <label for="gateway">Default Gateway (Optional):</label>
+                        <label for="gateway">Gateway:</label>
                         <input type="text" id="gateway" name="gateway" placeholder="e.g. 192.168.1.1">
+                        <p class="form-help" id="gateway-help">Override DHCP-provided gateway (optional)</p>
                     </div>
                     
                     <div class="form-group">
-                        <label for="dns">DNS Servers (Optional):</label>
+                        <label for="dns">DNS Servers:</label>
                         <input type="text" id="dns" name="dns" placeholder="e.g. 8.8.8.8 8.8.4.4">
-                        <p class="form-help">Separate multiple DNS servers with spaces</p>
+                        <p class="form-help" id="dns-help">Override DHCP-provided DNS servers (optional)</p>
                     </div>
                 </div>
                 
@@ -308,15 +365,21 @@ function createInterfaceEditForm() {
     }
 }
 
+// Helper function to set loading state on buttons
+function setButtonLoading(button, loadingText) {
+    const originalText = button.textContent;
+    button.innerHTML = `${loadingText}... <span class="loading"></span>`;
+    button.disabled = true;
+    return originalText;
+}
+
 function updateInterface() {
     const formData = new FormData(document.getElementById('interface-form'));
     const iface = formData.get('iface');
     
     // Show loading indicator on button
     const submitButton = document.querySelector('#interface-form .button');
-    const originalText = submitButton.textContent;
-    submitButton.innerHTML = 'Applying Changes... <span class="loading"></span>';
-    submitButton.disabled = true;
+    const originalText = setButtonLoading(submitButton, 'Applying Changes');
     
     // Set pending operation
     pendingOperations.interfaceUpdates = true;
@@ -372,9 +435,7 @@ function restartService(service) {
     if (confirm('Are you sure you want to restart ' + service + '?')) {
         // Show loading indicator
         const button = document.querySelector(`button[onclick="restartService('${service}')"]`);
-        const originalText = button.textContent;
-        button.innerHTML = 'Restarting... <span class="loading"></span>';
-        button.disabled = true;
+        const originalText = setButtonLoading(button, 'Restarting');
         
         // Set pending operation
         pendingOperations.serviceRestarts[service] = true;
@@ -445,23 +506,62 @@ function updateInterfaceTable(interfaces) {
             return;
         }
         
+        // Update the global interfaces data for reference by other functions
+        latestInterfaceData = interfaces;
+        
+        // Find the current default interface (the one with default route)
+        let defaultInterface = null;
+        interfaces.forEach(iface => {
+            if (iface.has_default_route) {
+                defaultInterface = iface.name;
+            }
+        });
+        
         // Build a simple table for the dashboard
-        let html = '<table class="network-table"><thead><tr><th>Interface</th><th>IP Address</th><th>Status</th><th>Internet</th><th>Actions</th></tr></thead><tbody>';
+        let html = '<table class="network-table"><thead><tr><th>Interface</th><th>IP Address</th><th>Status</th><th>Internet</th><th>Default Route</th><th>Actions</th></tr></thead><tbody>';
         
         interfaces.forEach(iface => {
             // Skip loopback interface for actions
             const showActions = iface.name !== 'lo';
             
             // Create main row for interface
-            html += `<tr>
+            html += `<tr ${iface.has_default_route ? 'class="default-route-row"' : ''}>
                 <td>${iface.name}${iface.type === 'usb' ? ' <span class="badge badge-info">USB</span>' : ''}</td>
                 <td>${iface.addr || 'Not assigned'}</td>
-                <td>${iface.state === 'UP' 
-                    ? '<span class="badge badge-success">UP</span>' 
-                    : '<span class="badge badge-danger">DOWN</span>'}</td>
+                <td>`;
+                
+            // Improved status display - Enhanced for better USB interface detection
+            if (iface.state === 'UP') {
+                html += '<span class="badge badge-success">UP</span>';
+            } else if (iface.state.includes('DOWN (connected)')) {
+                html += '<span class="badge badge-warning" title="Interface is physically connected but administratively down">DOWN (Connected)</span>';
+            } else {
+                // Check for carrier signal especially for USB interfaces
+                if (iface.type === 'usb' && iface.has_carrier) {
+                    html += '<span class="badge badge-warning" title="USB device detected but interface is down">DOWN (Device Connected)</span>';
+                } else {
+                    html += '<span class="badge badge-danger">DOWN</span>';
+                }
+            }
+            
+            html += `</td>
                 <td>${iface.has_internet 
                     ? '<span class="badge badge-success" title="This interface has internet connectivity">✓</span>' 
                     : '<span class="badge badge-warning" title="No internet connection detected">✗</span>'}</td>
+                <td>`;
+            
+            // Replace radio button with badge for default route
+            if (iface.name !== 'lo') {
+                if (iface.has_default_route) {
+                    html += '<span class="badge badge-success">Default Route</span>';
+                } else {
+                    html += '-';
+                }
+            } else {
+                html += `-`;
+            }
+            
+            html += `</td>
                 <td>`;
             
             // Add action buttons if not loopback
@@ -474,14 +574,30 @@ function updateInterfaceTable(interfaces) {
                 // Edit button always shown
                 html += `<button class="button button-sm" onclick="showEditForm('${iface.name}')">Edit</button>`;
                 
-                // Cycle interface (not for wlan0)
-                if (iface.name !== 'wlan0') {
-                    html += `<button class="button button-sm" onclick="cycleInterface('${iface.name}')">Cycle</button>`;
+                // Add "Set Default Route" option if interface is UP and not already the default route
+                if (iface.state === 'UP' && !iface.has_default_route) {
+                    html += `<button class="button button-sm button-primary" onclick="setDefaultRoute('${iface.name}')">Set Default Route</button>`;
                 }
                 
-                // Renew DHCP (for Ethernet)
-                if (iface.name.startsWith('eth') || (iface.name !== 'wlan0' && iface.name !== 'lo')) {
-                    html += `<button class="button button-sm" onclick="renewDhcp('${iface.name}')">Renew DHCP</button>`;
+                // Different actions based on interface state
+                if (iface.state.includes('DOWN')) {
+                    // Cycle button for down interfaces
+                    html += `<button class="button button-sm button-warning" onclick="cycleInterface('${iface.name}')">Cycle</button>`;
+                    
+                    // Only add DHCP renewal if not wlan0
+                    if (iface.name !== 'wlan0' && iface.name !== 'lo') {
+                        html += `<button class="button button-sm" onclick="renewDhcp('${iface.name}')">Activate</button>`;
+                    }
+                } else {
+                    // Cycle interface (not for wlan0)
+                    if (iface.name !== 'wlan0') {
+                        html += `<button class="button button-sm" onclick="cycleInterface('${iface.name}')">Cycle</button>`;
+                    }
+                    
+                    // Renew DHCP (for Ethernet)
+                    if (iface.name.startsWith('eth') || (iface.name !== 'wlan0' && iface.name !== 'lo')) {
+                        html += `<button class="button button-sm" onclick="renewDhcp('${iface.name}')">Renew DHCP</button>`;
+                    }
                 }
                 
                 html += `</div>`;
@@ -493,7 +609,7 @@ function updateInterfaceTable(interfaces) {
             
             // Add hidden details row that can be shown with the View button
             html += `<tr id="details-${iface.name}" class="hidden">
-                <td colspan="5" class="interface-details">
+                <td colspan="6" class="interface-details">
                     <div class="loading"><span class="loading-spinner"></span> Loading interface details...</div>
                 </td>
             </tr>`;
@@ -522,16 +638,66 @@ function viewInterface(iface) {
             .then(response => response.json())
             .then(data => {
                 if (data.success) {
-                    // Build a detailed view
+                    // Create tabs for the interface details
                     let detailsHtml = '<div class="interface-details-container">';
                     
-                    // Basic info section
-                    detailsHtml += '<div class="details-section"><h4>Basic Information</h4>';
+                    // Add tabs navigation
+                    detailsHtml += `
+                    <ul class="nav-tabs">
+                        <li class="nav-item"><a class="nav-link active" href="#" onclick="switchTab('${iface}-basic-info', this); return false;">Basic Info</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('${iface}-routes', this); return false;">Routes</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('${iface}-statistics', this); return false;">Statistics</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="switchTab('${iface}-raw-info', this); return false;">Raw Info</a></li>
+                    </ul>
+                    <div class="tab-content">`;
+                    
+                    // Basic info tab (active by default)
+                    detailsHtml += `<div id="${iface}-basic-info" class="tab-pane active">`;
+                    detailsHtml += '<div class="details-section">';
                     detailsHtml += `<p><strong>Name:</strong> ${data.details.name || iface}</p>`;
                     detailsHtml += `<p><strong>MAC Address:</strong> ${data.details.mac_address || 'N/A'}</p>`;
                     detailsHtml += `<p><strong>IP Address:</strong> ${data.details.ip || 'Not assigned'}</p>`;
                     detailsHtml += `<p><strong>Netmask:</strong> ${data.details.netmask || 'N/A'}</p>`;
-                    detailsHtml += `<p><strong>Gateway:</strong> ${data.details.gateway || 'N/A'}</p>`;
+                    
+                    // Get current interface data for gateway and route information
+                    let gatewayHtml = data.details.gateway || 'Not configured';
+                    let availableRoutes = [];
+                    let currentGateway = data.details.gateway || '';
+                    let isDefaultRoute = false;
+                    
+                    if (latestInterfaceData) {
+                        const ifaceData = latestInterfaceData.find(i => i.name === iface);
+                        if (ifaceData) {
+                            isDefaultRoute = ifaceData.has_default_route;
+                            currentGateway = ifaceData.gateway;
+                            if (ifaceData.all_routes && ifaceData.all_routes.length > 0) {
+                                availableRoutes = ifaceData.all_routes;
+                                
+                                // Create gateway display with dropdown if multiple routes are available
+                                if (availableRoutes.length > 1) {
+                                    gatewayHtml = `
+                                    <div class="gateway-selector">
+                                        <span class="current-gateway">${currentGateway || 'Not configured'}</span>
+                                        <div class="gateway-actions">
+                                            <select id="gateway-options-${iface}" class="gateway-select">
+                                                ${availableRoutes.map(gw => 
+                                                    `<option value="${gw}" ${gw === currentGateway ? 'selected' : ''}>${gw}</option>`
+                                                ).join('')}
+                                            </select>
+                                            <button class="button button-sm" onclick="switchGateway('${iface}')">Switch</button>
+                                        </div>
+                                    </div>`;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Default route status indicator
+                    if (isDefaultRoute) {
+                        detailsHtml += `<p class="default-route-indicator"><strong>Default Route:</strong> <span class="badge badge-success">Active</span> <span class="default-route-note">(This interface is used for the system's default route)</span></p>`;
+                    }
+                    
+                    detailsHtml += `<p><strong>Gateway:</strong> ${gatewayHtml}</p>`;
                     detailsHtml += `<p><strong>DNS Servers:</strong> ${data.details.dns || 'N/A'}</p>`;
                     detailsHtml += `<p><strong>MTU:</strong> ${data.details.mtu || 'Default'}</p>`;
                     
@@ -548,28 +714,125 @@ function viewInterface(iface) {
                     }
                     detailsHtml += `<p><strong>Internet Connectivity:</strong> ${internetStatus}</p>`;
                     
-                    detailsHtml += '</div>';
+                    // Additional recovery options for DOWN USB interfaces
+                    if (latestInterfaceData) {
+                        const ifaceData = latestInterfaceData.find(i => i.name === iface);
+                        if (ifaceData && ifaceData.type === 'usb' && ifaceData.state.includes('DOWN')) {
+                            detailsHtml += `<div class="recovery-actions">
+                                <h5>Recovery Options</h5>
+                                <button class="button button-sm" onclick="cycleInterface('${iface}')">Cycle Interface</button>
+                                <button class="button button-sm" onclick="renewDhcp('${iface}')">Request IP</button>
+                            </div>`;
+                        }
+                    }
                     
-                    // Network statistics section
+                    detailsHtml += '</div></div>';
+                    
+                    // Routes tab (new)
+                    detailsHtml += `<div id="${iface}-routes" class="tab-pane">`;
+                    detailsHtml += '<div class="details-section">';
+                    
+                    // Add the routing table info
+                    detailsHtml += '<h5>Routing Table</h5>';
+                    
+                    if (data.details.routes && data.details.routes.length > 0) {
+                        detailsHtml += '<table class="modern-table"><thead><tr>';
+                        detailsHtml += '<th>Destination</th><th>Gateway</th><th>Mask</th><th>Flags</th><th>Metric</th><th>Interface</th>';
+                        detailsHtml += '</tr></thead><tbody>';
+                        
+                        data.details.routes.forEach(route => {
+                            const isDefaultRoute = route.destination === '0.0.0.0' || route.destination === 'default';
+                            const rowClass = isDefaultRoute ? 'default-route' : '';
+                            
+                            detailsHtml += `<tr class="${rowClass}">`;
+                            detailsHtml += `<td>${route.destination || 'default'}</td>`;
+                            detailsHtml += `<td>${route.gateway || '*'}</td>`;
+                            detailsHtml += `<td>${route.mask || '*'}</td>`;
+                            detailsHtml += `<td>${route.flags || ''}</td>`;
+                            detailsHtml += `<td>${route.metric || ''}</td>`;
+                            detailsHtml += `<td>${route.interface || iface}</td>`;
+                            detailsHtml += '</tr>';
+                        });
+                        
+                        detailsHtml += '</tbody></table>';
+                    } else {
+                        detailsHtml += '<p>No route information available</p>';
+                        
+                        // Fetch the route table on demand using ip route command
+                        detailsHtml += `
+                        <div id="route-loading-${iface}" class="loading">
+                            <span class="loading-spinner"></span> Loading routes...
+                        </div>
+                        <div id="route-table-${iface}"></div>
+                        <button class="button button-sm" onclick="fetchRoutes('${iface}')">Refresh Routes</button>`;
+                    }
+                    
+                    // Gateway information
+                    detailsHtml += '<h5>Gateway Configuration</h5>';
+                    detailsHtml += `<p><strong>Current Gateway:</strong> ${currentGateway || 'Not configured'}</p>`;
+                    
+                    if (data.details.dhcp_info) {
+                        detailsHtml += `<p><strong>DHCP Provided Gateway:</strong> ${data.details.dhcp_info.gateway || 'N/A'}</p>`;
+                        
+                        if (data.details.dhcp_info.gateway_override) {
+                            detailsHtml += `<p><strong>Gateway Override:</strong> ${data.details.dhcp_info.gateway_override}</p>`;
+                        }
+                    }
+                    
+                    // Add gateway test button
+                    detailsHtml += `
+                    <div class="gateway-test">
+                        <button class="button button-sm" onclick="testGateway('${iface}')">Test Gateway Connectivity</button>
+                        <div id="gateway-test-result-${iface}" class="test-result"></div>
+                    </div>`;
+                    
+                    detailsHtml += '</div></div>';
+                    
+                    // Statistics tab
+                    detailsHtml += `<div id="${iface}-statistics" class="tab-pane">`;
+                    detailsHtml += '<div class="details-section">';
+                    
                     if (data.details.stats) {
-                        detailsHtml += '<div class="details-section"><h4>Statistics</h4>';
                         detailsHtml += `<p><strong>RX Packets:</strong> ${data.details.stats.rx_packets || '0'}</p>`;
                         detailsHtml += `<p><strong>TX Packets:</strong> ${data.details.stats.tx_packets || '0'}</p>`;
                         detailsHtml += `<p><strong>RX Bytes:</strong> ${data.details.stats.rx_bytes || '0'}</p>`;
                         detailsHtml += `<p><strong>TX Bytes:</strong> ${data.details.stats.tx_bytes || '0'}</p>`;
                         detailsHtml += `<p><strong>Errors:</strong> ${data.details.stats.errors || '0'}</p>`;
-                        detailsHtml += '</div>';
+                        
+                        if (data.details.stats.dropped) {
+                            detailsHtml += `<p><strong>Dropped Packets:</strong> ${data.details.stats.dropped}</p>`;
+                        }
+                        
+                        if (data.details.stats.collisions) {
+                            detailsHtml += `<p><strong>Collisions:</strong> ${data.details.stats.collisions}</p>`;
+                        }
+                    } else {
+                        detailsHtml += '<p>No statistics available</p>';
                     }
                     
-                    // Raw output section if available
+                    detailsHtml += '</div></div>';
+                    
+                    // Raw output tab
+                    detailsHtml += `<div id="${iface}-raw-info" class="tab-pane">`;
+                    detailsHtml += '<div class="details-section">';
+                    
                     if (data.details.raw_info) {
-                        detailsHtml += '<div class="details-section"><h4>Raw Interface Information</h4>';
                         detailsHtml += `<pre>${data.details.raw_info}</pre>`;
-                        detailsHtml += '</div>';
+                    } else {
+                        detailsHtml += '<p>No raw information available</p>';
                     }
                     
-                    detailsHtml += '</div>';
+                    detailsHtml += '</div></div>';
+                    
+                    // Close the tabs container
+                    detailsHtml += '</div></div>';
+                    
                     detailsRow.querySelector('td').innerHTML = detailsHtml;
+                    
+                    // If routes were not provided, fetch them
+                    if (!data.details.routes || data.details.routes.length === 0) {
+                        fetchRoutes(iface);
+                    }
                 } else {
                     detailsRow.querySelector('td').innerHTML = 
                         `<div class="error">Error loading interface details: ${data.message || 'Unknown error'}</div>`;
@@ -582,6 +845,110 @@ function viewInterface(iface) {
     } else {
         detailsRow.classList.add('hidden');
     }
+}
+
+// Function to switch between tabs
+function switchTab(tabId, tabLink) {
+    // Get all tab panes in the same container as the target tab
+    const targetTab = document.getElementById(tabId);
+    if (!targetTab) return;
+    
+    const tabContent = targetTab.closest('.tab-content');
+    if (!tabContent) return;
+    
+    // Hide all tabs in this container
+    const allTabs = tabContent.querySelectorAll('.tab-pane');
+    allTabs.forEach(tab => tab.classList.remove('active'));
+    
+    // Show the selected tab
+    targetTab.classList.add('active');
+    
+    // Update active state on tab links
+    if (tabLink) {
+        const navTabs = tabLink.closest('.nav-tabs');
+        if (navTabs) {
+            const allLinks = navTabs.querySelectorAll('.nav-link');
+            allLinks.forEach(link => link.classList.remove('active'));
+            tabLink.classList.add('active');
+        }
+    }
+}
+
+// Function to fetch routes for an interface
+function fetchRoutes(iface) {
+    const loadingElement = document.getElementById(`route-loading-${iface}`);
+    const routeTableElement = document.getElementById(`route-table-${iface}`);
+    
+    if (loadingElement) loadingElement.style.display = 'flex';
+    if (routeTableElement) routeTableElement.innerHTML = '';
+    
+    fetch(`/get_routes/${iface}`)
+        .then(response => response.json())
+        .then(data => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            
+            if (data.success && data.routes && data.routes.length > 0) {
+                let routeHtml = '<table class="modern-table"><thead><tr>';
+                routeHtml += '<th>Destination</th><th>Gateway</th><th>Mask</th><th>Flags</th><th>Metric</th><th>Interface</th>';
+                routeHtml += '</tr></thead><tbody>';
+                
+                data.routes.forEach(route => {
+                    const isDefaultRoute = route.destination === '0.0.0.0' || route.destination === 'default';
+                    const rowClass = isDefaultRoute ? 'default-route' : '';
+                    
+                    routeHtml += `<tr class="${rowClass}">`;
+                    routeHtml += `<td>${route.destination || 'default'}</td>`;
+                    routeHtml += `<td>${route.gateway || '*'}</td>`;
+                    routeHtml += `<td>${route.mask || '*'}</td>`;
+                    routeHtml += `<td>${route.flags || ''}</td>`;
+                    routeHtml += `<td>${route.metric || ''}</td>`;
+                    routeHtml += `<td>${route.interface || iface}</td>`;
+                    routeHtml += '</tr>';
+                });
+                
+                routeHtml += '</tbody></table>';
+                
+                if (routeTableElement) routeTableElement.innerHTML = routeHtml;
+            } else {
+                if (routeTableElement) {
+                    routeTableElement.innerHTML = '<p>No routes found for this interface</p>';
+                }
+            }
+        })
+        .catch(error => {
+            if (loadingElement) loadingElement.style.display = 'none';
+            if (routeTableElement) {
+                routeTableElement.innerHTML = `<p class="error">Error fetching routes: ${error.message}</p>`;
+            }
+        });
+}
+
+// Function to test gateway connectivity
+function testGateway(iface) {
+    const resultElement = document.getElementById(`gateway-test-result-${iface}`);
+    if (resultElement) {
+        resultElement.innerHTML = '<span class="loading-spinner"></span> Testing gateway...';
+    }
+    
+    fetch(`/test_gateway/${iface}`)
+        .then(response => response.json())
+        .then(data => {
+            if (resultElement) {
+                if (data.success) {
+                    resultElement.innerHTML = `<span class="badge badge-success">Gateway is reachable</span>`;
+                    if (data.ping_time) {
+                        resultElement.innerHTML += ` <span class="ping-time">(${data.ping_time}ms)</span>`;
+                    }
+                } else {
+                    resultElement.innerHTML = `<span class="badge badge-danger">Gateway is unreachable</span> ${data.message || ''}`;
+                }
+            }
+        })
+        .catch(error => {
+            if (resultElement) {
+                resultElement.innerHTML = `<span class="badge badge-danger">Test failed</span> ${error.message}`;
+            }
+        });
 }
 
 // Function to update services table with new data
@@ -679,16 +1046,43 @@ function addServiceRow(svc, container) {
         statusBadge = `<span class="badge badge-warning">${svc.status}</span>`;
     }
     
+    // Add enabled/disabled info and memory usage if available
+    let additionalInfo = '';
+    if (svc.enabled) {
+        const enabledText = svc.enabled === 'enabled' ? 'Auto-start' : 'Manual';
+        additionalInfo += `<small class="service-info">${enabledText}</small>`;
+    }
+    if (svc.memory && svc.memory !== 'N/A') {
+        additionalInfo += `<small class="service-info">Memory: ${svc.memory}</small>`;
+    }
+    
     tr.innerHTML = `
-        <td>${svc.name}</td>
+        <td>
+            ${svc.name}
+            ${additionalInfo ? `<br/>${additionalInfo}` : ''}
+        </td>
         <td>${statusBadge}</td>
         <td class="action-buttons">
+            <button class="button button-sm" onclick="viewServiceDetails('${svc.name}')">
+                Details
+            </button>
             <button class="button button-sm button-danger" onclick="restartService('${svc.name}')">
                 Restart
             </button>
         </td>
     `;
     container.appendChild(tr);
+    
+    // Add hidden details row
+    const detailsRow = document.createElement('tr');
+    detailsRow.id = `service-details-${svc.name}`;
+    detailsRow.className = 'hidden service-details-row';
+    detailsRow.innerHTML = `
+        <td colspan="3" class="service-details">
+            <div class="loading"><span class="loading-spinner"></span> Loading service details...</div>
+        </td>
+    `;
+    container.appendChild(detailsRow);
 }
 
 // Update the log entries display
@@ -712,6 +1106,478 @@ function updateLogEntries(logs) {
         `;
         logSection.appendChild(logEntry);
     });
+}
+
+// Function to view service details
+function viewServiceDetails(serviceName) {
+    const detailsRow = document.getElementById(`service-details-${serviceName}`);
+    if (!detailsRow) {
+        console.error(`Details row for service ${serviceName} not found`);
+        return;
+    }
+    
+    // Toggle visibility
+    const isHidden = detailsRow.classList.contains('hidden');
+    if (isHidden) {
+        detailsRow.classList.remove('hidden');
+        
+        // Load detailed information about the service
+        fetch(`/get_service_details/${serviceName}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    const service = data.service;
+                    
+                    // Create detailed service information display
+                    let detailsHtml = '<div class="service-details-container">';
+                    
+                    // Add tabs navigation
+                    detailsHtml += `
+                    <ul class="nav-tabs">
+                        <li class="nav-item"><a class="nav-link active" href="#" onclick="switchServiceTab('${serviceName}-overview', this); return false;">Overview</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="switchServiceTab('${serviceName}-status', this); return false;">Status</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="switchServiceTab('${serviceName}-logs', this); return false;">Logs</a></li>
+                        <li class="nav-item"><a class="nav-link" href="#" onclick="switchServiceTab('${serviceName}-config', this); return false;">Configuration</a></li>
+                    </ul>
+                    <div class="tab-content">`;
+                    
+                    // Overview tab (active by default)
+                    detailsHtml += `<div id="${serviceName}-overview" class="tab-pane active">`;
+                    detailsHtml += '<div class="details-section">';
+                    detailsHtml += `<p><strong>Service Name:</strong> ${service.name}</p>`;
+                    detailsHtml += `<p><strong>Status:</strong> ${service.status}</p>`;
+                    detailsHtml += `<p><strong>Auto-start:</strong> ${service.enabled}</p>`;
+                    
+                    // Additional overview info if available
+                    if (service.unit_info) {
+                        if (service.unit_info.User) {
+                            detailsHtml += `<p><strong>Run As User:</strong> ${service.unit_info.User}</p>`;
+                        }
+                        if (service.unit_info.WorkingDirectory) {
+                            detailsHtml += `<p><strong>Working Directory:</strong> ${service.unit_info.WorkingDirectory}</p>`;
+                        }
+                        if (service.unit_info.ExecStart) {
+                            detailsHtml += `<p><strong>Executable:</strong> <code>${service.unit_info.ExecStart}</code></p>`;
+                        }
+                    }
+                    detailsHtml += '</div></div>';
+                    
+                    // Status tab
+                    detailsHtml += `<div id="${serviceName}-status" class="tab-pane">`;
+                    detailsHtml += '<div class="details-section">';
+                    if (service.full_status) {
+                        detailsHtml += `<pre class="service-status-output">${service.full_status}</pre>`;
+                    } else {
+                        detailsHtml += '<p>No status information available</p>';
+                    }
+                    detailsHtml += '</div></div>';
+                    
+                    // Logs tab
+                    detailsHtml += `<div id="${serviceName}-logs" class="tab-pane">`;
+                    detailsHtml += '<div class="details-section">';
+                    if (service.logs && service.logs !== 'Logs unavailable') {
+                        detailsHtml += `<pre class="service-logs-output">${service.logs}</pre>`;
+                    } else {
+                        detailsHtml += '<p>No recent logs available</p>';
+                    }
+                    detailsHtml += '</div></div>';
+                    
+                    // Configuration tab
+                    detailsHtml += `<div id="${serviceName}-config" class="tab-pane">`;
+                    detailsHtml += '<div class="details-section">';
+                    if (service.unit_info && Object.keys(service.unit_info).length > 0) {
+                        detailsHtml += '<h4>Unit File Configuration</h4>';
+                        for (const [key, value] of Object.entries(service.unit_info)) {
+                            detailsHtml += `<p><strong>${key}:</strong> <code>${value}</code></p>`;
+                        }
+                    } else {
+                        detailsHtml += '<p>No configuration details available</p>';
+                    }
+                    detailsHtml += '</div></div>';
+                    
+                    // Close the tabs container
+                    detailsHtml += '</div></div>';
+                    
+                    // Set the content
+                    detailsRow.querySelector('.service-details').innerHTML = detailsHtml;
+                } else {
+                    detailsRow.querySelector('.service-details').innerHTML = 
+                        `<div class="error">Error loading service details: ${data.error || 'Unknown error'}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('Error loading service details:', error);
+                detailsRow.querySelector('.service-details').innerHTML = 
+                    `<div class="error">Error loading service details: ${error.message}</div>`;
+            });
+    } else {
+        detailsRow.classList.add('hidden');
+    }
+}
+
+// Function to switch service detail tabs
+function switchServiceTab(tabId, element) {
+    // Get the service name from the tab ID
+    const serviceName = tabId.split('-')[0];
+    
+    // Hide all tab panes for this service
+    document.querySelectorAll(`[id^="${serviceName}-"]`).forEach(pane => {
+        if (pane.classList.contains('tab-pane')) {
+            pane.classList.remove('active');
+        }
+    });
+    
+    // Show the selected tab pane
+    const targetPane = document.getElementById(tabId);
+    if (targetPane) {
+        targetPane.classList.add('active');
+    }
+    
+    // Update nav-link active state
+    const tabContainer = element.closest('.nav-tabs');
+    if (tabContainer) {
+        tabContainer.querySelectorAll('.nav-link').forEach(link => {
+            link.classList.remove('active');
+        });
+        element.classList.add('active');
+    }
+}
+
+// AnyDesk Management Functions
+function loadAnydeskStatus() {
+    fetch('/get_anydesk_status')
+        .then(response => response.json())
+        .then(data => {
+            updateAnydeskDisplay(data.status);
+        })
+        .catch(error => {
+            console.error('Error loading AnyDesk status:', error);
+            const container = document.getElementById('anydesk-container');
+            if (container) {
+                container.innerHTML = '<div class="error">Failed to load AnyDesk status</div>';
+            }
+        });
+}
+
+function updateAnydeskDisplay(status) {
+    const container = document.getElementById('anydesk-container');
+    if (!container) return;
+    
+    let html = '<div class="anydesk-status-container">';
+    
+    if (!status.installed) {
+        // AnyDesk not installed
+        html += `
+            <div class="anydesk-not-installed">
+                <div class="status-indicator">
+                    <span class="badge badge-danger">Not Installed</span>
+                </div>
+                <p>AnyDesk is not installed on this system.</p>
+                <div class="anydesk-actions">
+                    <button class="button button-primary" onclick="installAnydesk()">
+                        Install AnyDesk
+                    </button>
+                </div>
+            </div>
+        `;
+    } else {
+        // AnyDesk is installed
+        html += '<div class="anydesk-info-grid">';
+        
+        // Status and ID section
+        html += '<div class="anydesk-status-card">';
+        html += '<h4>Status & Connection</h4>';
+        
+        // Service status
+        let statusBadge = '';
+        if (status.service_status === 'active') {
+            statusBadge = '<span class="badge badge-success">Running</span>';
+        } else if (status.service_status === 'inactive') {
+            statusBadge = '<span class="badge badge-danger">Stopped</span>';
+        } else {
+            statusBadge = `<span class="badge badge-warning">${status.service_status}</span>`;
+        }
+        
+        html += `<p><strong>Service Status:</strong> ${statusBadge}</p>`;
+        html += `<p><strong>Auto-start:</strong> ${status.service_enabled ? '✅ Enabled' : '❌ Disabled'}</p>`;
+        html += `<p><strong>Version:</strong> ${status.version}</p>`;
+        
+        // AnyDesk ID
+        if (status.anydesk_id) {
+            html += `<p><strong>AnyDesk ID:</strong> <code class="anydesk-id">${status.anydesk_id}</code> 
+                     <button class="button button-sm" onclick="copyAnydeskId('${status.anydesk_id}')">Copy</button></p>`;
+        } else {
+            html += `<p><strong>AnyDesk ID:</strong> <span class="text-warning">Not available</span></p>`;
+        }
+        
+        html += '</div>';
+        
+        // Dependencies section
+        html += '<div class="anydesk-deps-card">';
+        html += '<h4>Dependencies</h4>';
+        
+        if (status.dependencies_ok) {
+            html += '<p class="deps-ok">✅ All dependencies satisfied</p>';
+        } else {
+            html += '<p class="deps-issues">⚠️ Issues detected:</p>';
+            html += '<ul class="deps-issues-list">';
+            status.dependency_issues.forEach(issue => {
+                html += `<li>${issue}</li>`;
+            });
+            html += '</ul>';
+        }
+        
+        html += '</div>';
+        
+        // Password management
+        html += '<div class="anydesk-password-card">';
+        html += '<h4>Password Management</h4>';
+        html += `
+            <div class="password-form">
+                <label for="anydesk-password">Unattended Access Password:</label>
+                <div class="password-input-group">
+                    <input type="password" id="anydesk-password" placeholder="Enter new password (min 6 chars)" />
+                    <button class="button button-sm button-primary" onclick="setAnydeskPassword()">Set Password</button>
+                </div>
+                <small class="form-help">Password must be at least 6 characters long</small>
+            </div>
+        `;
+        html += '</div>';
+        
+        // Actions section
+        html += '<div class="anydesk-actions-card">';
+        html += '<h4>Actions</h4>';
+        html += '<div class="action-buttons">';
+        
+        if (status.service_status !== 'active') {
+            html += '<button class="button button-primary" onclick="restartAnydesk()">Start AnyDesk</button>';
+        } else {
+            html += '<button class="button" onclick="restartAnydesk()">Restart AnyDesk</button>';
+        }
+        
+        if (!status.service_enabled) {
+            html += '<button class="button button-secondary" onclick="enableAnydeskAutostart()">Enable Auto-start</button>';
+        }
+        
+        html += '<button class="button button-sm" onclick="viewAnydeskLogs()">View Logs</button>';
+        html += '</div>';
+        html += '</div>';
+        
+        html += '</div>'; // End info grid
+    }
+    
+    html += '</div>'; // End container
+    
+    container.innerHTML = html;
+}
+
+function installAnydesk() {
+    if (!confirm('Install AnyDesk? This will download and install AnyDesk from the official repository.')) {
+        return;
+    }
+    
+    const statusMessage = document.createElement('div');
+    statusMessage.className = 'status-bar info';
+    statusMessage.textContent = 'Installing AnyDesk... This may take several minutes.';
+    document.body.appendChild(statusMessage);
+    
+    fetch('/install_anydesk', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        statusMessage.className = `status-bar ${data.success ? 'success' : 'error'}`;
+        statusMessage.textContent = data.message;
+        
+        if (data.success) {
+            // Reload AnyDesk status
+            setTimeout(() => {
+                loadAnydeskStatus();
+                document.body.removeChild(statusMessage);
+            }, 3000);
+        } else {
+            setTimeout(() => {
+                document.body.removeChild(statusMessage);
+            }, 5000);
+        }
+    })
+    .catch(error => {
+        statusMessage.className = 'status-bar error';
+        statusMessage.textContent = 'Installation failed: ' + error.message;
+        setTimeout(() => {
+            document.body.removeChild(statusMessage);
+        }, 5000);
+    });
+}
+
+function setAnydeskPassword() {
+    const passwordInput = document.getElementById('anydesk-password');
+    const password = passwordInput.value;
+    
+    if (!password || password.length < 6) {
+        alert('Password must be at least 6 characters long');
+        return;
+    }
+    
+    const statusMessage = document.createElement('div');
+    statusMessage.className = 'status-bar info';
+    statusMessage.textContent = 'Setting AnyDesk password...';
+    document.body.appendChild(statusMessage);
+    
+    const formData = new FormData();
+    formData.append('password', password);
+    
+    fetch('/set_anydesk_password', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        statusMessage.className = `status-bar ${data.success ? 'success' : 'error'}`;
+        statusMessage.textContent = data.message;
+        
+        if (data.success) {
+            passwordInput.value = '';
+            // Update display with new status
+            updateAnydeskDisplay(data.status);
+        }
+        
+        setTimeout(() => {
+            document.body.removeChild(statusMessage);
+        }, 3000);
+    })
+    .catch(error => {
+        statusMessage.className = 'status-bar error';
+        statusMessage.textContent = 'Error setting password: ' + error.message;
+        setTimeout(() => {
+            document.body.removeChild(statusMessage);
+        }, 5000);
+    });
+}
+
+function restartAnydesk() {
+    const statusMessage = document.createElement('div');
+    statusMessage.className = 'status-bar info';
+    statusMessage.textContent = 'Restarting AnyDesk...';
+    document.body.appendChild(statusMessage);
+    
+    fetch('/restart_anydesk', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        statusMessage.className = `status-bar ${data.success ? 'success' : 'error'}`;
+        statusMessage.textContent = data.message;
+        
+        if (data.success) {
+            // Update display with new status
+            updateAnydeskDisplay(data.status);
+        }
+        
+        setTimeout(() => {
+            document.body.removeChild(statusMessage);
+        }, 3000);
+    })
+    .catch(error => {
+        statusMessage.className = 'status-bar error';
+        statusMessage.textContent = 'Error restarting AnyDesk: ' + error.message;
+        setTimeout(() => {
+            document.body.removeChild(statusMessage);
+        }, 5000);
+    });
+}
+
+function enableAnydeskAutostart() {
+    fetch('/enable_anydesk_autostart', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(data => {
+        const statusMessage = document.createElement('div');
+        statusMessage.className = `status-bar ${data.success ? 'success' : 'error'}`;
+        statusMessage.textContent = data.message;
+        document.body.appendChild(statusMessage);
+        
+        if (data.success) {
+            // Update display with new status
+            updateAnydeskDisplay(data.status);
+        }
+        
+        setTimeout(() => {
+            document.body.removeChild(statusMessage);
+        }, 3000);
+    })
+    .catch(error => {
+        const statusMessage = document.createElement('div');
+        statusMessage.className = 'status-bar error';
+        statusMessage.textContent = 'Error enabling auto-start: ' + error.message;
+        document.body.appendChild(statusMessage);
+        setTimeout(() => {
+            document.body.removeChild(statusMessage);
+        }, 5000);
+    });
+}
+
+function copyAnydeskId(id) {
+    if (navigator.clipboard) {
+        navigator.clipboard.writeText(id).then(() => {
+            const statusMessage = document.createElement('div');
+            statusMessage.className = 'status-bar success';
+            statusMessage.textContent = 'AnyDesk ID copied to clipboard';
+            document.body.appendChild(statusMessage);
+            setTimeout(() => {
+                document.body.removeChild(statusMessage);
+            }, 2000);
+        });
+    } else {
+        // Fallback for older browsers
+        const textArea = document.createElement('textarea');
+        textArea.value = id;
+        document.body.appendChild(textArea);
+        textArea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textArea);
+        
+        const statusMessage = document.createElement('div');
+        statusMessage.className = 'status-bar success';
+        statusMessage.textContent = 'AnyDesk ID copied to clipboard';
+        document.body.appendChild(statusMessage);
+        setTimeout(() => {
+            document.body.removeChild(statusMessage);
+        }, 2000);
+    }
+}
+
+function viewAnydeskLogs() {
+    fetch('/get_anydesk_logs')
+        .then(response => response.json())
+        .then(data => {
+            // Create modal for logs
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h3>AnyDesk Logs</h3>
+                        <span class="close" onclick="this.parentElement.parentElement.parentElement.remove()">&times;</span>
+                    </div>
+                    <div class="modal-body">
+                        <pre class="service-logs-output">${data.logs}</pre>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+            
+            // Close modal when clicking outside
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    modal.remove();
+                }
+            });
+        })
+        .catch(error => {
+            alert('Error loading logs: ' + error.message);
+        });
 }
 
 // Update indicator for pending operations
@@ -872,11 +1738,16 @@ function updateSerialDevices(devices) {
     }
     
     // Build a table for the serial devices
-    let html = '<table class="serial-table"><thead><tr><th>Device</th><th>Manufacturer</th><th>Product</th><th>Serial</th></tr></thead><tbody>';
+    let html = '<table class="serial-table"><thead><tr><th>Device</th><th>Type</th><th>Manufacturer</th><th>Product</th><th>Serial</th></tr></thead><tbody>';
     
     devices.forEach(device => {
+        // Add USB badge for USB devices
+        const isUsb = device.path.includes('usb') || device.path.includes('ttyUSB') || 
+                     (device.manufacturer && device.manufacturer !== 'Unknown');
+        
         html += `<tr>
             <td>${device.path}</td>
+            <td>${isUsb ? '<span class="badge badge-info">USB</span>' : 'Serial'}</td>
             <td>${device.manufacturer}</td>
             <td>${device.product}</td>
             <td>${device.serial}</td>
@@ -1070,6 +1941,9 @@ window.onload = function() {
     // Use fallback data immediately to show something
     updateWithFallbackData();
     
+    // Load AnyDesk status
+    loadAnydeskStatus();
+    
     // Then try to get real data
     pollForUpdates();
     
@@ -1080,15 +1954,14 @@ window.onload = function() {
     const refreshBtn = document.getElementById('refresh-btn');
     if (refreshBtn) {
         refreshBtn.addEventListener('click', function() {
-            // Show loading indicator
-            this.innerHTML = 'Refreshing... <span class="loading"></span>';
-            this.disabled = true;
+            // Show loading indicator using our helper
+            const originalText = setButtonLoading(this, 'Refreshing');
             
             pollForUpdates();
             
             // Reset button after a delay
             setTimeout(() => {
-                this.textContent = 'Refresh';
+                this.innerHTML = originalText;
                 this.disabled = false;
             }, 1000);
         });
@@ -1107,9 +1980,7 @@ function renewDhcp(iface) {
             console.error(`Button for interface ${iface} not found`);
             return;
         }
-        const originalText = button.textContent;
-        button.innerHTML = 'Renewing<span class="loading"></span>';
-        button.disabled = true;
+        const originalText = setButtonLoading(button, 'Renewing');
         
         // Show status message
         const statusBar = document.getElementById('status-message');
@@ -1422,9 +2293,7 @@ function cycleInterface(iface) {
     if (confirm(`Are you sure you want to cycle (turn off and on) the ${iface} interface?`)) {
         // Show loading indicator
         const button = document.querySelector(`button[onclick="cycleInterface('${iface}')"]`);
-        const originalText = button.textContent;
-        button.innerHTML = 'Cycling<span class="loading"></span>';
-        button.disabled = true;
+        const originalText = setButtonLoading(button, 'Cycling');
         
         // Show status message
         const statusBar = document.getElementById('status-message');
@@ -1457,4 +2326,211 @@ function cycleInterface(iface) {
             button.disabled = false;
         });
     }
+}
+
+// Function to switch gateway for an interface
+function switchGateway(iface) {
+    const selectElement = document.getElementById(`gateway-options-${iface}`);
+    if (!selectElement) {
+        console.error(`Gateway options select for ${iface} not found`);
+        return;
+    }
+    
+    const newGateway = selectElement.value;
+    if (!newGateway) {
+        console.error('No gateway selected');
+        return;
+    }
+    
+    // Show status message
+    const statusBar = document.getElementById('status-message');
+    if (statusBar) {
+        statusBar.textContent = `Switching gateway for ${iface} to ${newGateway}...`;
+        statusBar.className = 'status-bar info';
+        statusBar.style.display = 'block';
+    }
+    
+    // Get the switch button and set loading state
+    const button = document.querySelector(`button[onclick="switchGateway('${iface}')"]`);
+    const originalText = setButtonLoading(button, 'Switching');
+    
+    // Set pending operation
+    pendingOperations.interfaceUpdates = true;
+    updatePendingStatus();
+    
+    // Create form data for the request
+    const formData = new FormData();
+    formData.append('iface', iface);
+    formData.append('gateway', newGateway);
+    
+    // Send request to switch gateway
+    fetch('/switch_gateway', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Update status message
+        if (statusBar) {
+            statusBar.textContent = data.message;
+            statusBar.className = 'status-bar ' + (data.success ? 'success' : 'error');
+        }
+        
+        // Reset button
+        if (button) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+        
+        if (data.success) {
+            // Update the interface table with new data
+            updateInterfaceTable(data.interfaces);
+            
+            // Also update the global interfaces data
+            latestInterfaceData = data.interfaces;
+            
+            // Refresh the interface details display
+            const detailsRow = document.getElementById(`details-${iface}`);
+            if (detailsRow) {
+                // Toggle it off and on to refresh
+                detailsRow.classList.add('hidden');
+                setTimeout(() => {
+                    viewInterface(iface);
+                }, 100);
+            }
+            
+            // Wait a bit then clear pending operation
+            setTimeout(() => {
+                pendingOperations.interfaceUpdates = false;
+                updatePendingStatus();
+            }, 2000);
+        } else {
+            pendingOperations.interfaceUpdates = false;
+            updatePendingStatus();
+        }
+    })
+    .catch(error => {
+        console.error('Error switching gateway:', error);
+        if (statusBar) {
+            statusBar.textContent = 'Error: ' + error.message;
+            statusBar.className = 'status-bar error';
+        }
+        
+        // Reset button
+        if (button) {
+            button.innerHTML = originalText;
+            button.disabled = false;
+        }
+        
+        pendingOperations.interfaceUpdates = false;
+        updatePendingStatus();
+    });
+}
+
+// Function to set an interface as the default route
+function setDefaultRoute(iface) {
+    // Don't proceed if the interface is already the default
+    if (latestInterfaceData) {
+        const ifaceData = latestInterfaceData.find(i => i.name === iface);
+        if (ifaceData && ifaceData.has_default_route) {
+            console.log(`${iface} is already the default route`);
+            return;
+        }
+    }
+    
+    // Show status message
+    const statusBar = document.getElementById('status-message');
+    if (!statusBar) {
+        // Create the status bar if it doesn't exist
+        const statusBar = document.createElement('div');
+        statusBar.id = 'status-message';
+        statusBar.className = 'status-bar info';
+        document.body.appendChild(statusBar);
+    }
+    
+    statusBar.textContent = `Setting ${iface} as the default route...`;
+    statusBar.className = 'status-bar info';
+    statusBar.style.display = 'block';
+    
+    // Disable all radio buttons while processing
+    const radioButtons = document.querySelectorAll('input[name="default-route"]');
+    radioButtons.forEach(radio => {
+        radio.disabled = true;
+    });
+    
+    // Set pending operation
+    pendingOperations.interfaceUpdates = true;
+    updatePendingStatus();
+    
+    // Create form data for the request
+    const formData = new FormData();
+    formData.append('iface', iface);
+    formData.append('set_default', 'true');
+    
+    // Send request to set default route
+    fetch('/set_default_route', {
+        method: 'POST',
+        body: formData
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Update status message
+        statusBar.textContent = data.message || `Default route set to ${iface}`;
+        statusBar.className = 'status-bar ' + (data.success ? 'success' : 'error');
+        
+        // Re-enable radio buttons
+        radioButtons.forEach(radio => {
+            radio.disabled = false;
+        });
+        
+        if (data.success) {
+            // Update the interface table with new data
+            if (data.interfaces) {
+                // Store the updated interfaces data globally
+                latestInterfaceData = data.interfaces;
+                
+                // Update the interface table display
+                updateInterfaceTable(data.interfaces);
+                
+                // If interface details are visible, refresh them
+                const detailsRow = document.getElementById(`details-${iface}`);
+                if (detailsRow && !detailsRow.classList.contains('hidden')) {
+                    // Toggle the details to refresh
+                    setTimeout(() => {
+                        viewInterface(iface);
+                    }, 300);
+                }
+            } else {
+                // If no interfaces data returned, poll for updates
+                pollForUpdates();
+            }
+            
+            // Wait a bit then clear pending operation
+            setTimeout(() => {
+                pendingOperations.interfaceUpdates = false;
+                updatePendingStatus();
+            }, 2000);
+        } else {
+            // If failed, refresh the interface table to reset the radio button state
+            pollForUpdates();
+            pendingOperations.interfaceUpdates = false;
+            updatePendingStatus();
+        }
+    })
+    .catch(error => {
+        console.error('Error setting default route:', error);
+        statusBar.textContent = 'Error: ' + error.message;
+        statusBar.className = 'status-bar error';
+        
+        // Re-enable radio buttons
+        radioButtons.forEach(radio => {
+            radio.disabled = false;
+        });
+        
+        // Refresh the table to reset the radio button state
+        pollForUpdates();
+        
+        pendingOperations.interfaceUpdates = false;
+        updatePendingStatus();
+    });
 } 

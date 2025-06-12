@@ -1,0 +1,1343 @@
+{% extends "base.html" %}
+
+{% block title %}Serial Communication{% endblock %}
+
+{% block nav_serial %}active{% endblock %}
+
+{% block extra_css %}
+<style>
+    .serial-container {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+    
+    .device-list {
+        max-height: 300px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        margin-bottom: 15px;
+    }
+    
+    .device-item {
+        padding: 15px;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background-color 0.2s;
+    }
+    
+    .device-item:hover {
+        background: var(--hover-color);
+    }
+    
+    .device-item.connected {
+        background: #28a745 !important;
+        color: white !important;
+    }
+    
+    .device-item.connected .device-path {
+        color: #e6ffe9 !important;
+    }
+    
+    .device-item.connected .device-name {
+        color: white !important;
+        font-weight: bold;
+    }
+    
+    .device-item.selected {
+        background: #007bff !important;
+        color: white !important;
+    }
+    
+    .device-item.selected .device-path {
+        color: #e6f3ff !important;
+    }
+    
+    .device-item.selected .device-name {
+        color: white !important;
+        font-weight: bold;
+    }
+    
+    .device-info {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .device-details {
+        flex: 1;
+    }
+    
+    .device-name {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .device-path {
+        font-size: 0.9em;
+        color: var(--text-muted);
+    }
+    
+    .device-status {
+        text-align: right;
+    }
+    
+    .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-left: 10px;
+    }
+    
+    .status-connected {
+        background: #28a745;
+    }
+    
+    .status-disconnected {
+        background: #dc3545;
+    }
+    
+    .control-row {
+        display: flex;
+        gap: 10px;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+    
+    .terminal-container {
+        background: #000;
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
+        padding: 15px;
+        border-radius: 4px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: 400px;
+        margin-bottom: 15px;
+        border: 2px solid #333;
+        position: relative;
+        cursor: text;
+        max-height: 60vh;
+        word-wrap: break-word;
+        white-space: pre-wrap;
+    }
+    
+    .terminal-container:focus {
+        outline: none;
+        border-color: #555;
+    }
+    
+    .terminal-line {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        line-height: 1.2;
+    }
+    
+    .terminal-input-line {
+        margin: 0;
+        padding: 0;
+        white-space: pre;
+        word-wrap: break-word;
+        line-height: 1.2;
+        position: relative;
+        display: block;
+    }
+    
+    .terminal-prompt {
+        color: #00ff00;
+        font-weight: bold;
+        display: inline;
+        margin: 0;
+        padding: 0;
+    }
+    
+    #input-content {
+        display: inline;
+        margin: 0;
+        padding: 0;
+        color: #00ff00;
+    }
+    
+    .terminal-input {
+        background: transparent;
+        border: none;
+        color: #00ff00;
+        font-family: inherit;
+        font-size: inherit;
+        outline: none;
+        width: auto;
+        min-width: 2px;
+    }
+    
+    .terminal-cursor {
+        background: #00ff00;
+        color: #000;
+        animation: blink 1s infinite;
+        display: inline;
+        margin: 0;
+        padding: 0;
+    }
+    
+    #cursor {
+        background: #00ff00;
+        color: #000;
+        animation: blink 1s infinite;
+        display: inline;
+        margin: 0;
+        padding: 0;
+    }
+    
+    @keyframes blink {
+        0%, 50% { opacity: 1; }
+        51%, 100% { opacity: 0; }
+    }
+    
+    .autocomplete-popup {
+        position: absolute;
+        background: #222;
+        border: 1px solid #444;
+        border-radius: 4px;
+        max-height: 150px;
+        overflow-y: auto;
+        z-index: 1000;
+        font-family: 'Courier New', monospace;
+        font-size: 14px;
+        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    }
+    
+    .autocomplete-popup .item {
+        padding: 4px 8px;
+        cursor: pointer;
+        color: #00ff00;
+    }
+    
+    .autocomplete-popup .item:hover,
+    .autocomplete-popup .item.selected {
+        background: #444;
+        color: #fff;
+    }
+    
+    .command-input-container {
+        display: none;
+    }
+    
+    .device-actions {
+        display: flex;
+        gap: 5px;
+        margin-top: 10px;
+    }
+    
+    .device-actions .button {
+        padding: 5px 10px;
+        font-size: 12px;
+    }
+    
+    .terminal-controls {
+        display: flex;
+        gap: 10px;
+        margin-bottom: 15px;
+        align-items: center;
+    }
+    
+    #selected-device-info {
+        margin-left: auto;
+        font-style: italic;
+        color: var(--text-muted);
+    }
+    
+    .checkbox-label {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        user-select: none;
+        margin-bottom: 0;
+    }
+    
+    .checkbox-label input[type="checkbox"] {
+        margin: 0;
+    }
+    
+    .button-sm {
+        padding: 4px 8px;
+        font-size: 12px;
+    }
+    
+    .module-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    /* Compact controls styling */
+    .compact-controls {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+    
+    .control-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+    
+    .control-row label {
+        font-size: 0.9em;
+        margin: 0;
+        white-space: nowrap;
+        min-width: 40px;
+    }
+    
+    .form-control-sm {
+        padding: 4px 8px;
+        font-size: 0.9em;
+        height: auto;
+        min-width: 80px;
+        border: 1px solid var(--border-color);
+        border-radius: 4px;
+        background: var(--input-bg);
+        color: var(--text-color);
+    }
+    
+    .checkbox-label-compact {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.9em;
+        margin: 0;
+        white-space: nowrap;
+    }
+    
+    .checkbox-label-compact input[type="checkbox"] {
+        margin: 0;
+    }
+    
+    /* Collapsible panel animation */
+    #customization-panel {
+        transition: all 0.3s ease;
+        overflow: hidden;
+    }
+    
+    #customization-chevron.expanded {
+        transform: rotate(180deg);
+    }
+    
+    /* Terminal Color Schemes */
+    .terminal-container.green-on-black {
+        background: #000;
+        color: #00ff00;
+    }
+    
+    .terminal-container.white-on-black {
+        background: #000;
+        color: #ffffff;
+    }
+    
+    .terminal-container.amber-on-black {
+        background: #000;
+        color: #ffbf00;
+    }
+    
+    .terminal-container.blue-on-black {
+        background: #000;
+        color: #00bfff;
+    }
+    
+    .terminal-container.dark-modern {
+        background: #1e1e1e;
+        color: #d4d4d4;
+        border-color: #3c3c3c;
+    }
+    
+    .terminal-container.high-contrast {
+        background: #000000;
+        color: #ffffff;
+        border-color: #ffffff;
+    }
+    
+    /* Terminal customization */
+    .terminal-container.custom-font-size {
+        font-size: var(--terminal-font-size, 14px);
+    }
+    
+    .terminal-container.custom-line-height .terminal-line {
+        line-height: var(--terminal-line-height, 1.2);
+    }
+    
+    .timestamp {
+        color: #888;
+        font-size: 0.9em;
+        margin-right: 8px;
+    }
+    
+    @media (max-width: 768px) {
+        .serial-container {
+            grid-template-columns: 1fr;
+        }
+        
+        .terminal-container {
+            height: 300px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="serial-container">
+    <!-- Device Management Panel -->
+    <div class="card">
+        <h2><i class="fas fa-usb"></i> Serial Devices</h2>
+        
+        <div class="status-bar info">
+            Connected Devices: <span id="connected-count">0</span>
+            <button class="button button-secondary" onclick="refreshDevices()">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+        
+        <div class="device-list" id="device-list">
+            <div class="device-item">
+                <div class="device-info">
+                    <div class="device-details">
+                        <div class="device-name">No devices found</div>
+                        <div class="device-path">Click refresh to scan for devices</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="module-card">
+            <div class="module-card-header">
+                <h3>Connection Settings</h3>
+            </div>
+            <div class="module-card-body">
+                <div class="form-field">
+                    <label for="baudrate-select">Baud Rate:</label>
+                    <select id="baudrate-select" class="form-control">
+                        <option value="9600">9600</option>
+                        <option value="115200">115200</option>
+                    </select>
+                </div>
+                
+                <div class="control-row">
+                    <button class="button button-success" id="connect-btn" onclick="connectDevice()" disabled>
+                        <i class="fas fa-plug"></i> Connect
+                    </button>
+                    <button class="button button-warning" id="reconnect-btn" onclick="reconnectDevice()" disabled>
+                        <i class="fas fa-redo"></i> Reconnect
+                    </button>
+                    <button class="button button-danger" id="disconnect-btn" onclick="disconnectDevice()" disabled>
+                        <i class="fas fa-unlink"></i> Disconnect
+                    </button>
+                    <button class="button button-secondary" id="test-btn" onclick="testDevice()" disabled>
+                        <i class="fas fa-vial"></i> Test
+                    </button>
+                </div>
+                
+                <div class="control-row">
+                    <button class="button button-danger" onclick="disconnectAll()">
+                        <i class="fas fa-power-off"></i> Disconnect All
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="module-card">
+            <div class="module-card-header">
+                <h3 onclick="toggleCustomizationPanel()" style="cursor: pointer;">
+                    <i class="fas fa-palette"></i> Terminal Settings
+                    <i class="fas fa-chevron-down" id="customization-chevron" style="float: right; transition: transform 0.3s;"></i>
+                </h3>
+                <button class="button button-sm button-secondary" onclick="resetTerminalSettings()" title="Reset to defaults">
+                    <i class="fas fa-undo"></i>
+                </button>
+            </div>
+            <div class="module-card-body" id="customization-panel" style="display: none;">
+                <div class="compact-controls">
+                    <div class="control-row">
+                        <label for="font-size-select">Font:</label>
+                        <select id="font-size-select" class="form-control-sm" onchange="updateTerminalSettings()">
+                            <option value="12">12px</option>
+                            <option value="14" selected>14px</option>
+                            <option value="16">16px</option>
+                            <option value="18">18px</option>
+                        </select>
+                        
+                        <label for="color-scheme-select">Theme:</label>
+                        <select id="color-scheme-select" class="form-control-sm" onchange="updateTerminalSettings()">
+                            <option value="green-on-black" selected>Green/Black</option>
+                            <option value="white-on-black">White/Black</option>
+                            <option value="amber-on-black">Amber/Black</option>
+                            <option value="dark-modern">Modern</option>
+                        </select>
+                    </div>
+                    
+                    <div class="control-row">
+                        <label for="buffer-size-select">Buffer:</label>
+                        <select id="buffer-size-select" class="form-control-sm" onchange="updateTerminalSettings()">
+                            <option value="500">500</option>
+                            <option value="1000" selected>1000</option>
+                            <option value="2000">2000</option>
+                        </select>
+                        
+                        <label class="checkbox-label-compact">
+                            <input type="checkbox" id="auto-scroll-checkbox" checked onchange="updateTerminalSettings()">
+                            Auto-scroll
+                        </label>
+                        
+                        <label class="checkbox-label-compact">
+                            <input type="checkbox" id="show-timestamps-checkbox" onchange="updateTerminalSettings()">
+                            Timestamps
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- Advanced options (initially hidden) -->
+                <div class="advanced-options" id="advanced-options" style="display: none; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+                    <div class="form-field">
+                        <label for="line-height-select">Line Height:</label>
+                        <select id="line-height-select" class="form-control" onchange="updateTerminalSettings()">
+                            <option value="1.0">Compact (1.0)</option>
+                            <option value="1.2" selected>Normal (1.2)</option>
+                            <option value="1.4">Relaxed (1.4)</option>
+                            <option value="1.6">Spacious (1.6)</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-field">
+                        <label for="color-scheme-select-full">Full Color Options:</label>
+                        <select id="color-scheme-select-full" class="form-control" onchange="updateFullColorScheme()">
+                            <option value="green-on-black" selected>Green on Black (Classic)</option>
+                            <option value="white-on-black">White on Black</option>
+                            <option value="amber-on-black">Amber on Black</option>
+                            <option value="blue-on-black">Blue on Black</option>
+                            <option value="dark-modern">Dark Modern</option>
+                            <option value="high-contrast">High Contrast</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-field">
+                        <label for="buffer-size-select-full">Extended Buffer Options:</label>
+                        <select id="buffer-size-select-full" class="form-control" onchange="updateFullBufferSize()">
+                            <option value="500">500 lines</option>
+                            <option value="1000" selected>1000 lines</option>
+                            <option value="2000">2000 lines</option>
+                            <option value="5000">5000 lines</option>
+                            <option value="10000">10000 lines</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="control-row" style="margin-top: 10px;">
+                    <button class="button button-sm button-secondary" onclick="toggleAdvancedOptions()" id="advanced-toggle">
+                        <i class="fas fa-cog"></i> Advanced
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Terminal Panel -->
+    <div class="card">
+        <h2><i class="fas fa-terminal"></i> Terminal</h2>
+        
+        <div class="terminal-controls">
+            <button class="button button-secondary" onclick="clearTerminal()">
+                <i class="fas fa-eraser"></i> Clear
+            </button>
+            <button class="button button-primary" onclick="downloadOutput()" id="download-btn" disabled>
+                <i class="fas fa-download"></i> Download Log
+            </button>
+            <span id="selected-device-info">
+                No device selected
+            </span>
+        </div>
+        
+        <div class="terminal-container" id="terminal-output" tabindex="0">
+            <div class="terminal-line">Serial Communication Terminal</div>
+            <div class="terminal-line">Select a device from the left panel to begin communication.</div>
+            <div class="terminal-line"></div>
+            <div class="terminal-input-line" id="input-line" style="display: none;">
+                <span class="terminal-prompt" id="terminal-prompt">user@device:~$ </span>
+                <span id="input-content"></span>
+                <span class="terminal-cursor" id="cursor">█</span>
+            </div>
+        </div>
+        
+        <div class="command-input-container">
+            <input 
+                type="text" 
+                id="command-input" 
+                class="command-input" 
+                placeholder="Type command and press Enter..." 
+                disabled
+                autocomplete="off"
+                style="display: none;"
+            >
+            <button class="button button-primary" id="send-btn" onclick="sendCommand()" disabled style="display: none;">
+                <i class="fas fa-paper-plane"></i> Send
+            </button>
+        </div>
+        
+        <div class="autocomplete-popup" id="autocomplete-popup" style="display: none;"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<!-- Include Socket.IO -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Global variables
+    let socket;
+    let selectedDevice = null;
+    let devices = [];
+    let autocompleteCommands = [];
+    let autocompleteVisible = false;
+    let autocompleteIndex = -1;
+    let autocompleteItems = [];
+    
+    // Device-specific terminal states (like PuTTY - separate sessions)
+    let deviceTerminals = {};  // device_path -> {content: [], inputEnabled: false}
+    
+    // Raw terminal mode - no artificial prompts
+    let rawTerminalMode = true;
+    
+    // Terminal customization settings
+    let terminalSettings = {
+        fontSize: 14,
+        colorScheme: 'green-on-black',
+        lineHeight: 1.2,
+        bufferSize: 1000,
+        autoScroll: true,
+        showTimestamps: false
+    };
+    
+    // Device connection history for reconnect functionality
+    let deviceConnectionHistory = {}; // device_path -> {baudrate: number, lastConnected: timestamp}
+    
+    // Initialize the application
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeSocket();
+        initializeEventListeners();
+        loadBaudrates();
+        loadTerminalSettings();
+        refreshDevices();
+    });
+    
+    // Initialize Socket.IO connection
+    function initializeSocket() {
+        socket = io('/serial');
+        
+        socket.on('connect', function() {
+            console.log('Connected to serial interface');
+            addTerminalLine('Connected to serial interface', 'info');
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('Disconnected from serial interface');
+            addTerminalLine('Disconnected from serial interface', 'error');
+        });
+        
+        socket.on('device_list', function(data) {
+            updateDeviceList(data.devices);
+            document.getElementById('connected-count').textContent = data.connected_count;
+        });
+        
+        socket.on('serial_output', function(data) {
+            // Add output to device-specific terminal
+            addDeviceOutput(data.device, data.data);
+            
+            // If this device is currently selected, show the output
+            if (selectedDevice && data.device === selectedDevice.path) {
+                addTerminalLine(data.data, 'output');
+            }
+        });
+        
+        socket.on('command_result', function(data) {
+            if (data.success) {
+                // Don't show "command sent" message - just show the output
+            } else {
+                addTerminalLine(`Error sending command: ${data.message}`, 'error');
+            }
+        });
+        
+        socket.on('error', function(data) {
+            addTerminalLine(`Error: ${data.message}`, 'error');
+        });
+    }
+    
+    // Initialize event listeners
+    function initializeEventListeners() {
+        const terminal = document.getElementById('terminal-output');
+        
+        // Terminal focus and input handling
+        terminal.addEventListener('click', function() {
+            const currentTerminal = getCurrentDeviceTerminal();
+            if (currentTerminal && currentTerminal.inputEnabled) {
+                terminal.focus();
+            }
+        });
+        
+        terminal.addEventListener('keydown', function(event) {
+            const currentTerminal = getCurrentDeviceTerminal();
+            if (!currentTerminal || !currentTerminal.inputEnabled) return;
+            
+            event.preventDefault();
+            
+            // Raw terminal mode - send everything directly to device like PuTTY
+            if (selectedDevice && selectedDevice.connected) {
+                let charToSend = null;
+                
+                // Handle special keys
+                if (event.ctrlKey) {
+                    switch(event.key.toLowerCase()) {
+                        case 'c':
+                            socket.emit('send_break', { device_path: selectedDevice.path });
+                            return;
+                        case 'z':
+                            charToSend = '\x1a';  // Ctrl+Z
+                            break;
+                        case 'd':
+                            charToSend = '\x04';  // Ctrl+D
+                            break;
+                        case 'l':
+                            // Clear terminal but send Ctrl+L to device too
+                            clearCurrentTerminal();
+                            charToSend = '\x0c';  // Ctrl+L
+                            break;
+                        default:
+                            return;
+                    }
+                } else {
+                    // Regular keys
+                    switch(event.key) {
+                        case 'Enter':
+                            charToSend = '\r\n';
+                            break;
+                        case 'Backspace':
+                            charToSend = '\b';
+                            break;
+                        case 'Delete':
+                            charToSend = '\x7f';
+                            break;
+                        case 'Tab':
+                            charToSend = '\t';
+                            break;
+                        case 'Escape':
+                            charToSend = '\x1b';
+                            break;
+                        case 'ArrowUp':
+                            charToSend = '\x1b[A';
+                            break;
+                        case 'ArrowDown':
+                            charToSend = '\x1b[B';
+                            break;
+                        case 'ArrowRight':
+                            charToSend = '\x1b[C';
+                            break;
+                        case 'ArrowLeft':
+                            charToSend = '\x1b[D';
+                            break;
+                        case 'Home':
+                            charToSend = '\x1b[H';
+                            break;
+                        case 'End':
+                            charToSend = '\x1b[F';
+                            break;
+                        case 'PageUp':
+                            charToSend = '\x1b[5~';
+                            break;
+                        case 'PageDown':
+                            charToSend = '\x1b[6~';
+                            break;
+                        case 'Insert':
+                            charToSend = '\x1b[2~';
+                            break;
+                        default:
+                            // Regular printable characters
+                            if (event.key.length === 1) {
+                                charToSend = event.key;
+                            }
+                            break;
+                    }
+                }
+                
+                // Send the character to the device
+                if (charToSend !== null) {
+                    socket.emit('send_raw_data', {
+                        device_path: selectedDevice.path,
+                        data: charToSend
+                    });
+                }
+            }
+        });
+        
+        // Prevent default browser shortcuts
+        terminal.addEventListener('keydown', function(event) {
+            if (event.ctrlKey && ['a', 's', 'r', 'n', 't', 'w'].includes(event.key.toLowerCase())) {
+                event.preventDefault();
+            }
+        });
+    }
+    
+    // Device terminal management functions
+    function getCurrentDeviceTerminal() {
+        return selectedDevice ? getOrCreateDeviceTerminal(selectedDevice.path) : null;
+    }
+    
+    function getOrCreateDeviceTerminal(devicePath) {
+        if (!deviceTerminals[devicePath]) {
+            deviceTerminals[devicePath] = {
+                content: [],
+                inputEnabled: false
+            };
+        }
+        return deviceTerminals[devicePath];
+    }
+    
+    function addDeviceOutput(devicePath, data) {
+        const deviceTerminal = getOrCreateDeviceTerminal(devicePath);
+        deviceTerminal.content.push(data);
+        
+        // Keep only last 1000 lines per device
+        if (deviceTerminal.content.length > 1000) {
+            deviceTerminal.content = deviceTerminal.content.slice(-1000);
+        }
+    }
+    
+    function loadDeviceTerminal(devicePath) {
+        const terminal = document.getElementById('terminal-output');
+        const deviceTerminal = getOrCreateDeviceTerminal(devicePath);
+        
+        // Clear current terminal display
+        terminal.innerHTML = '';
+        
+        // Load device history
+        deviceTerminal.content.forEach(content => {
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.style.color = '#00ff00';
+            line.textContent = content;
+            terminal.appendChild(line);
+        });
+        
+        scrollToBottom();
+    }
+    
+    function clearCurrentTerminal() {
+        if (selectedDevice) {
+            const deviceTerminal = getOrCreateDeviceTerminal(selectedDevice.path);
+            deviceTerminal.content = [];
+            
+            const terminal = document.getElementById('terminal-output');
+            terminal.innerHTML = '';
+        }
+    }
+    
+    // Load available baud rates
+    function loadBaudrates() {
+        const baudrates = [
+            300, 600, 1200, 2400, 4800, 9600, 14400, 19200, 28800, 
+            38400, 57600, 115200, 230400, 460800, 921600
+        ];
+        
+        const select = document.getElementById('baudrate-select');
+        select.innerHTML = '';
+        
+        baudrates.forEach(rate => {
+            const option = document.createElement('option');
+            option.value = rate;
+            option.textContent = rate;
+            if (rate === 115200) option.selected = true;
+            select.appendChild(option);
+        });
+    }
+    
+    // Refresh device list
+    function refreshDevices() {
+        fetch('/serial/devices')
+            .then(response => response.json())
+            .then(data => {
+                devices = data.devices;
+                updateDeviceList(data.devices);
+                document.getElementById('connected-count').textContent = data.connected_count;
+            })
+            .catch(error => {
+                addTerminalLine(`Error fetching devices: ${error}`, 'error');
+            });
+    }
+    
+    // Update device list display
+    function updateDeviceList(deviceList) {
+        const container = document.getElementById('device-list');
+        container.innerHTML = '';
+        
+        if (deviceList.length === 0) {
+            const item = document.createElement('div');
+            item.className = 'device-item';
+            item.innerHTML = `
+                <div class="device-info">
+                    <div class="device-details">
+                        <div class="device-name">No devices found</div>
+                        <div class="device-path">Click refresh to scan for devices</div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(item);
+            return;
+        }
+        
+        deviceList.forEach(device => {
+            const item = document.createElement('div');
+            item.className = 'device-item';
+            if (device.connected) item.classList.add('connected');
+            if (selectedDevice && selectedDevice.path === device.path) item.classList.add('selected');
+            
+            item.innerHTML = `
+                <div class="device-info">
+                    <div class="device-details">
+                        <div class="device-name">${device.name}</div>
+                        <div class="device-path">${device.path}</div>
+                    </div>
+                    <div class="device-status">
+                        <span class="status-indicator ${device.connected ? 'status-connected' : 'status-disconnected'}"></span>
+                    </div>
+                </div>
+            `;
+            
+            item.addEventListener('click', () => selectDevice(device));
+            container.appendChild(item);
+        });
+    }
+    
+    // Select a device
+    function selectDevice(device) {
+        selectedDevice = device;
+        
+        // Update selected device info
+        document.getElementById('selected-device-info').textContent = 
+            `Selected: ${device.name} (${device.path})`;
+        
+        // Load terminal history for this device
+        loadDeviceTerminal(device.path);
+        
+        // Update UI
+        updateDeviceList(devices);
+        updateControlStates();
+        
+        // Focus terminal if connected
+        if (device.connected) {
+            document.getElementById('terminal-output').focus();
+        }
+    }
+    
+    // Update control button states
+    function updateControlStates() {
+        const connectBtn = document.getElementById('connect-btn');
+        const reconnectBtn = document.getElementById('reconnect-btn');
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const testBtn = document.getElementById('test-btn');
+        const downloadBtn = document.getElementById('download-btn');
+        
+        if (selectedDevice) {
+            const hasConnectionHistory = deviceConnectionHistory[selectedDevice.path];
+            
+            connectBtn.disabled = selectedDevice.connected;
+            reconnectBtn.disabled = selectedDevice.connected || !hasConnectionHistory;
+            disconnectBtn.disabled = !selectedDevice.connected;
+            testBtn.disabled = false;
+            downloadBtn.disabled = !selectedDevice.connected;
+        } else {
+            connectBtn.disabled = true;
+            reconnectBtn.disabled = true;
+            disconnectBtn.disabled = true;
+            testBtn.disabled = true;
+            downloadBtn.disabled = true;
+        }
+    }
+    
+    // Connect to selected device
+    function connectDevice() {
+        if (!selectedDevice) return;
+        
+        const baudrate = parseInt(document.getElementById('baudrate-select').value);
+        
+        addTerminalLine(`Connecting to ${selectedDevice.name} at ${baudrate} baud...`, 'info');
+        
+        fetch('/serial/connect', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                device_path: selectedDevice.path,
+                baudrate: baudrate
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addTerminalLine(`Connected successfully: ${data.message}`, 'success');
+                addTerminalLine('Raw terminal mode enabled - device controls interface', 'info');
+                
+                selectedDevice.connected = true;
+                selectedDevice.baudrate = baudrate;
+                
+                // Store connection history for reconnect functionality
+                deviceConnectionHistory[selectedDevice.path] = {
+                    baudrate: baudrate,
+                    lastConnected: Date.now()
+                };
+                
+                // Enable raw input for this device
+                const deviceTerminal = getOrCreateDeviceTerminal(selectedDevice.path);
+                deviceTerminal.inputEnabled = true;
+                
+                updateControlStates();
+                refreshDevices();
+                
+                // Join device room for real-time output
+                socket.emit('join_device', {device_path: selectedDevice.path});
+                
+                // Focus terminal for immediate typing
+                document.getElementById('terminal-output').focus();
+            } else {
+                addTerminalLine(`Connection failed: ${data.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            addTerminalLine(`Connection error: ${error}`, 'error');
+        });
+    }
+    
+    // Reconnect to selected device using last known settings
+    function reconnectDevice() {
+        if (!selectedDevice) return;
+        
+        const history = deviceConnectionHistory[selectedDevice.path];
+        if (!history) {
+            addTerminalLine('No connection history found for this device', 'error');
+            return;
+        }
+        
+        // Set the baudrate to the last used value
+        document.getElementById('baudrate-select').value = history.baudrate;
+        
+        addTerminalLine(`Reconnecting to ${selectedDevice.name} using previous settings (${history.baudrate} baud)...`, 'info');
+        
+        // Use the existing connect function
+        connectDevice();
+    }
+    
+    // Disconnect from selected device
+    function disconnectDevice() {
+        if (!selectedDevice) return;
+        
+        fetch('/serial/disconnect', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                device_path: selectedDevice.path
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addTerminalLine(`Disconnected: ${data.message}`, 'info');
+                
+                selectedDevice.connected = false;
+                
+                // Disable input for this device
+                const deviceTerminal = getOrCreateDeviceTerminal(selectedDevice.path);
+                deviceTerminal.inputEnabled = false;
+                
+                updateControlStates();
+                refreshDevices();
+                
+                // Leave device room
+                socket.emit('leave_device', {device_path: selectedDevice.path});
+            } else {
+                addTerminalLine(`Disconnect failed: ${data.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            addTerminalLine(`Disconnect error: ${error}`, 'error');
+        });
+    }
+    
+    // Disconnect from all devices
+    function disconnectAll() {
+        fetch('/serial/disconnect_all', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addTerminalLine(`Disconnected from all devices: ${data.message}`, 'info');
+                refreshDevices();
+                if (selectedDevice) {
+                    selectedDevice.connected = false;
+                    updateControlStates();
+                }
+            } else {
+                addTerminalLine(`Error disconnecting all: ${data.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            addTerminalLine(`Error: ${error}`, 'error');
+        });
+    }
+    
+    // Test device connection
+    function testDevice() {
+        if (!selectedDevice) return;
+        
+        const baudrate = parseInt(document.getElementById('baudrate-select').value);
+        
+        addTerminalLine('Testing device connection...', 'info');
+        
+        fetch('/serial/test_device', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                device_path: selectedDevice.path,
+                baudrate: baudrate
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addTerminalLine(`Test successful: ${data.message}`, 'success');
+            } else {
+                addTerminalLine(`Test failed: ${data.message}`, 'error');
+            }
+        })
+        .catch(error => {
+            addTerminalLine(`Test error: ${error}`, 'error');
+        });
+    }
+    
+    // Terminal Customization Functions
+    function updateTerminalSettings() {
+        const terminal = document.getElementById('terminal-output');
+        
+        // Get current settings from UI
+        terminalSettings.fontSize = parseInt(document.getElementById('font-size-select').value);
+        terminalSettings.colorScheme = document.getElementById('color-scheme-select').value;
+        terminalSettings.lineHeight = parseFloat(document.getElementById('line-height-select').value);
+        terminalSettings.bufferSize = parseInt(document.getElementById('buffer-size-select').value);
+        terminalSettings.autoScroll = document.getElementById('auto-scroll-checkbox').checked;
+        terminalSettings.showTimestamps = document.getElementById('show-timestamps-checkbox').checked;
+        
+        // Apply font size
+        terminal.style.setProperty('--terminal-font-size', terminalSettings.fontSize + 'px');
+        terminal.classList.add('custom-font-size');
+        
+        // Apply color scheme
+        terminal.className = terminal.className.replace(/\b(green-on-black|white-on-black|amber-on-black|blue-on-black|dark-modern|high-contrast)\b/g, '');
+        terminal.classList.add(terminalSettings.colorScheme);
+        
+        // Apply line height
+        terminal.style.setProperty('--terminal-line-height', terminalSettings.lineHeight);
+        terminal.classList.add('custom-line-height');
+        
+        // Save settings to localStorage
+        localStorage.setItem('terminalSettings', JSON.stringify(terminalSettings));
+        
+        addTerminalLine('Terminal settings updated', 'info', false);
+    }
+    
+    function resetTerminalSettings() {
+        // Reset to defaults
+        document.getElementById('font-size-select').value = '14';
+        document.getElementById('color-scheme-select').value = 'green-on-black';
+        document.getElementById('line-height-select').value = '1.2';
+        document.getElementById('buffer-size-select').value = '1000';
+        document.getElementById('auto-scroll-checkbox').checked = true;
+        document.getElementById('show-timestamps-checkbox').checked = false;
+        
+        // Apply the reset settings
+        updateTerminalSettings();
+        
+        addTerminalLine('Terminal settings reset to defaults', 'info', false);
+    }
+    
+    function loadTerminalSettings() {
+        try {
+            const saved = localStorage.getItem('terminalSettings');
+            if (saved) {
+                const settings = JSON.parse(saved);
+                
+                // Update UI controls
+                document.getElementById('font-size-select').value = settings.fontSize || 14;
+                document.getElementById('color-scheme-select').value = settings.colorScheme || 'green-on-black';
+                document.getElementById('line-height-select').value = settings.lineHeight || 1.2;
+                document.getElementById('buffer-size-select').value = settings.bufferSize || 1000;
+                document.getElementById('auto-scroll-checkbox').checked = settings.autoScroll !== false;
+                document.getElementById('show-timestamps-checkbox').checked = settings.showTimestamps || false;
+                
+                // Sync advanced options if they exist
+                const fullColorSelect = document.getElementById('color-scheme-select-full');
+                const fullBufferSelect = document.getElementById('buffer-size-select-full');
+                if (fullColorSelect) fullColorSelect.value = settings.colorScheme || 'green-on-black';
+                if (fullBufferSelect) fullBufferSelect.value = settings.bufferSize || 1000;
+                
+                // Apply the loaded settings
+                updateTerminalSettings();
+            }
+        } catch (error) {
+            console.log('Failed to load terminal settings:', error);
+        }
+    }
+    
+    // Panel toggle functions
+    function toggleCustomizationPanel() {
+        const panel = document.getElementById('customization-panel');
+        const chevron = document.getElementById('customization-chevron');
+        
+        if (panel.style.display === 'none' || panel.style.display === '') {
+            panel.style.display = 'block';
+            chevron.classList.add('expanded');
+        } else {
+            panel.style.display = 'none';
+            chevron.classList.remove('expanded');
+        }
+    }
+    
+    function toggleAdvancedOptions() {
+        const advanced = document.getElementById('advanced-options');
+        const button = document.getElementById('advanced-toggle');
+        
+        if (advanced.style.display === 'none' || advanced.style.display === '') {
+            advanced.style.display = 'block';
+            button.innerHTML = '<i class="fas fa-cog"></i> Basic';
+        } else {
+            advanced.style.display = 'none';
+            button.innerHTML = '<i class="fas fa-cog"></i> Advanced';
+        }
+    }
+    
+    // Sync advanced options with main controls
+    function updateFullColorScheme() {
+        const fullSelect = document.getElementById('color-scheme-select-full');
+        const mainSelect = document.getElementById('color-scheme-select');
+        mainSelect.value = fullSelect.value;
+        updateTerminalSettings();
+    }
+    
+    function updateFullBufferSize() {
+        const fullSelect = document.getElementById('buffer-size-select-full');
+        const mainSelect = document.getElementById('buffer-size-select');
+        mainSelect.value = fullSelect.value;
+        updateTerminalSettings();
+    }
+    
+    // Utility functions
+    function scrollToBottom() {
+        if (!terminalSettings.autoScroll) return;
+        
+        const terminal = document.getElementById('terminal-output');
+        setTimeout(() => {
+            terminal.scrollTop = terminal.scrollHeight;
+        }, 10);
+    }
+    
+    // Clear current terminal (raw mode)
+    function clearTerminal() {
+        clearCurrentTerminal();
+    }
+    
+    // Add line to terminal
+    function addTerminalLine(text, type = 'output', storeInDevice = true) {
+        const terminal = document.getElementById('terminal-output');
+        
+        // Manage buffer size
+        const lines = terminal.querySelectorAll('.terminal-line');
+        if (lines.length >= terminalSettings.bufferSize) {
+            const linesToRemove = lines.length - terminalSettings.bufferSize + 1;
+            for (let i = 0; i < linesToRemove; i++) {
+                if (lines[i]) {
+                    lines[i].remove();
+                }
+            }
+        }
+        
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
+        
+        const timestamp = new Date().toLocaleTimeString();
+        let content = '';
+        
+        // Add timestamp if enabled
+        if (terminalSettings.showTimestamps && type !== 'output') {
+            content = `<span class="timestamp">[${timestamp}]</span>`;
+        }
+        
+        switch(type) {
+            case 'command':
+                line.style.color = '#ffff00';
+                content += text;
+                break;
+            case 'error':
+                line.style.color = '#ff0000';
+                content += `ERROR: ${text}`;
+                break;
+            case 'success':
+                line.style.color = '#00ff00';
+                content += `SUCCESS: ${text}`;
+                break;
+            case 'warning':
+                line.style.color = '#ffaa00';
+                content += `WARNING: ${text}`;
+                break;
+            case 'info':
+                line.style.color = '#00aaff';
+                content += `INFO: ${text}`;
+                break;
+            default:
+                // For regular output, inherit terminal color
+                content += text;
+        }
+        
+        if (terminalSettings.showTimestamps && type !== 'output') {
+            line.innerHTML = content;
+        } else {
+            line.textContent = content;
+        }
+        
+        terminal.appendChild(line);
+        
+        // Store in device terminal if requested and device is selected
+        if (storeInDevice && selectedDevice) {
+            addDeviceOutput(selectedDevice.path, text);
+        }
+        
+        scrollToBottom();
+    }
+    
+    // Download output log
+    function downloadOutput() {
+        if (!selectedDevice) return;
+        
+        const devicePath = selectedDevice.path.substring(1); // Remove leading slash
+        window.open(`/serial/download_output/${devicePath}`, '_blank');
+    }
+</script>
+{% endblock %} 

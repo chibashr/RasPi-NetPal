@@ -1,0 +1,11 @@
+[Unit]
+Description=Captive Network Monitor
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/bin/bash /opt/captive/scripts/network-monitor.sh
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target 

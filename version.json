@@ -1,9 +1,357 @@
-{
-  "version": "1.0.5",
+  {
+    "version": "2.0.0",
+    "description": "MAJOR: Pi Control SSH Terminal Redesign - PuTTY-like SSH Sessions",
+      "features": [
+      "MAJOR: Real SSH session management with username/password authentication",
+      "PuTTY-like SSH terminal interface with raw data transmission",
+      "Multiple concurrent SSH session support",
+      "Session-based terminal management with per-session history",
+      "SSH connection testing and authentication validation",
+      "Real-time bidirectional SSH communication",
+      "SSH session selection interface similar to serial communication",
+      "Raw character transmission without artificial prompts",
+      "Complete SSH terminal support with escape sequences",
+      "Session output logging and download functionality",
+      "SSH connection management with disconnect/reconnect",
+      "Authentication modal with host/port/username/password",
+      "SSH session status indicators and connection monitoring",
+      "Paramiko-based SSH connectivity with proper error handling",
+      "Network Recovery Monitor - Automatic IP address loss detection and recovery",
+      "10-second monitoring interval for eth0 and other network interfaces",
+      "Automatic DHCP recovery when IP addresses are randomly lost",
+      "Connectivity testing and restoration for network interfaces",
+      "Priority monitoring for eth0 interface (most common issue)",
+      "State persistence and recovery timeout protection",
+      "Comprehensive logging and web interface notifications",
+      "Integration with existing network hotplug detection system"
+    ],
+      "changes": [
+      "MAJOR: Completely redesigned Pi Control from faux terminal to real SSH sessions",
+      "MAJOR: Added SSH connection module (modules/ssh_comm.py) with Paramiko integration",
+      "MAJOR: Replaced console WebSocket handlers with SSH session management",
+      "MAJOR: Removed all artificial terminal emulation and command processing",
+      "MAJOR: Added username/password authentication modal interface",
+      "MAJOR: Implemented session-based terminal management like serial communication",
+      "Added SSH connection testing with credential validation",
+      "Added SSH session list management with connect/disconnect controls",
+      "Added real-time SSH output broadcasting via WebSocket",
+      "Added SSH session terminal history and output logging",
+      "Added paramiko dependency for secure SSH connectivity",
+      "Removed old command queue, console worker, and session handling",
+      "Transformed control.html into SSH session management interface",
+      "Added SSH route handlers for connect/disconnect/test operations",
+      "Enhanced error handling and connection status monitoring"
+    ],
+      "release_date": "2025-01-21",
+    "developer": "Michael Du Mez",
   "name": "Raspberry Pi Network Control Panel",
-  "developer": "Michael Du Mez",
-  "release_date": "2025-04-16",
-  "changelog": [
+      "changelog": [
+      {
+        "version": "2.0.0",
+        "date": "2025-01-21",
+        "changes": [
+          "MAJOR: Completely redesigned Pi Control from faux terminal to real SSH sessions",
+          "MAJOR: Added SSH connection module (modules/ssh_comm.py) with Paramiko integration",
+          "MAJOR: Replaced console WebSocket handlers with SSH session management",
+          "MAJOR: Removed all artificial terminal emulation and command processing",
+          "MAJOR: Added username/password authentication modal interface",
+          "MAJOR: Implemented session-based terminal management similar to serial communication",
+          "Added SSH connection testing with credential validation before connection",
+          "Added SSH session list management with connect/disconnect controls",
+          "Added real-time SSH output broadcasting via WebSocket rooms",
+          "Added SSH session terminal history and output logging per session",
+          "Added paramiko dependency for secure SSH connectivity",
+          "Removed old command queue, console worker, and session handling code",
+          "Transformed control.html into SSH session management interface",
+          "Added SSH route handlers (/ssh/connect, /ssh/disconnect, /ssh/test)",
+          "Enhanced error handling and connection status monitoring",
+          "Added PuTTY-like keyboard handling with escape sequences",
+          "Added session output download functionality",
+          "Added SSH session status indicators and visual feedback"
+        ]
+      },
+      {
+        "version": "1.4.2",
+        "date": "2025-01-21",
+        "changes": [
+          "Minimized terminal customization panel to save space - now collapsed by default",
+          "Added compact controls layout with smaller font sizes and inline arrangement",
+          "Made terminal settings panel collapsible with click-to-expand functionality",
+          "Added Advanced options toggle for rarely-used settings (line height, extended color schemes)",
+          "Reduced visual footprint of terminal customization while maintaining all functionality",
+          "Improved UI layout to show only essential controls (font size, color scheme, buffer size) initially",
+          "Added smooth animation transitions for panel expansion/collapse with chevron indicator",
+          "Enhanced settings synchronization between basic and advanced controls",
+          "Confirmed baud rate default remains at 9600 baud (already correctly configured)"
+        ]
+      },
+      {
+        "version": "1.4.1",
+        "date": "2025-06-12",
+        "changes": [
+          "MAJOR: Added Network Recovery Monitor for automatic IP address loss detection and recovery",
+          "Added continuous 10-second monitoring for eth0 and other network interface IP loss",
+          "Added automatic DHCP lease renewal when interfaces randomly lose IP addresses",
+          "Added state persistence to track interface changes and detect IP address loss",
+          "Added connectivity testing and restoration for interfaces with IP but no connectivity",
+          "Added priority monitoring for eth0 interface (user's primary concern)",
+          "Added recovery timeout protection (5 minutes) to prevent infinite recovery loops",
+          "Added comprehensive logging to /var/log/captive/network-recovery.log",
+          "Added web interface notifications when network recovery events occur",
+          "Added support for both dhclient and dhcpcd DHCP clients",
+          "Added systemd service (network-recovery.service) for automatic startup",
+          "Added installation script (install-network-recovery.sh) for easy setup",
+          "Added uninstallation script (uninstall-network-recovery.sh) for clean removal",
+          "Added comprehensive documentation (docs/Network-Recovery-Monitor.md)",
+          "Enhanced network monitoring to complement existing hotplug detection system",
+          "Fixed issue requiring manual port cycling after random IP address loss",
+          "Added service management commands for monitoring and troubleshooting"
+        ]
+      },
+      {
+        "version": "1.3.1",
+      "date": "2025-06-12",
+      "changes": [
+        "CRITICAL FIX: Removed all artificial prompt functions causing 'currentInput not defined' errors",
+        "Completely cleaned up old terminal emulation code",
+        "Removed showInputLine, hideInputLine, updateDisplay, handleEnter, and all related functions",
+        "Eliminated artificial prompts (user@device:~$) - only device prompts now",
+        "Fixed JavaScript errors preventing proper raw terminal operation",
+        "Removed autocomplete system - device handles all completion",
+        "Pure raw terminal mode - device has complete control over interface",
+        "Terminal now displays only device output with no web interference"
+      ]
+    },
+    {
+      "version": "1.3.0",
+      "date": "2025-06-12",
+      "changes": [
+        "MAJOR: Transformed terminal into PuTTY-like raw terminal emulator",
+        "MAJOR: Implemented separate terminal histories per device (no clearing when switching)",
+        "MAJOR: Added raw terminal pass-through mode - device controls the interface",
+        "MAJOR: Removed artificial prompts - all prompts now come from connected devices",
+        "Added direct character-by-character transmission to devices",
+        "Enhanced keyboard handling with proper escape sequences (arrow keys, special keys)",
+        "Added comprehensive ANSI terminal support (Ctrl combinations, escape sequences)",
+        "Implemented device-specific terminal session management",
+        "Added raw data WebSocket transmission for real-time device communication",
+        "Enhanced serial communication with pure pass-through mode",
+        "Fixed output reception issues with improved device-specific buffering",
+        "Terminal now behaves exactly like PuTTY - device provides all interface elements",
+        "Added terminal session persistence across device selections",
+        "Improved focus management for immediate typing capability"
+      ]
+    },
+    {
+      "version": "1.2.4",
+      "date": "2025-06-12",
+      "changes": [
+        "FIXED: Terminal prompt persistence issue - prompt now stays visible after pressing Enter",
+        "Enhanced input line management to ensure proper DOM structure after each command",
+        "Improved addTerminalLine function to maintain input line visibility",
+        "Added explicit input line recreation logic when DOM elements go missing",
+        "Enhanced ensureInputLineExists to use correct device name in prompt",
+        "Added visibility controls throughout terminal interaction flow"
+      ]
+    },
+    {
+      "version": "1.2.3",
+      "date": "2025-06-12",
+      "changes": [
+        "Fixed terminal prompt disappearing after pressing Enter - input line now persists",
+        "Added proper terminal container scrolling and text wrapping",
+        "Enabled empty command sending (sends newline to device as expected)",
+        "Added comprehensive keyboard shortcut support:",
+        "  - Ctrl+C sends break signal to connected device",
+        "  - Ctrl+Z sends suspend signal (SIGTSTP)",
+        "  - Ctrl+D sends EOF signal",
+        "  - Ctrl+L clears terminal",
+        "Enhanced serial communication with break signal support",
+        "Improved terminal CSS for better text wrapping and scrolling",
+        "Added overflow controls and viewport height limits",
+        "Fixed command handling to support all standard terminal operations"
+      ]
+    },
+    {
+      "version": "1.2.2",
+      "date": "2025-06-12",
+      "changes": [
+        "Fixed terminal input line formatting and alignment issues",
+        "Enhanced CSS styling for proper terminal input positioning",
+        "Added null checks and error handling for terminal DOM elements",
+        "Simplified cursor positioning logic to prevent layout breaks",
+        "Improved input line creation to maintain consistent formatting",
+        "Fixed terminal prompt alignment with consistent inline display",
+        "Added visibility controls for more reliable input line display"
+      ]
+    },
+    {
+      "version": "1.2.1",
+      "date": "2025-01-28",
+      "changes": [
+        "MAJOR: Transformed serial terminal into shell-like inline interface",
+        "MAJOR: Implemented real-time typing directly in terminal area",
+        "MAJOR: Added proper cursor positioning and blinking cursor animation",
+        "Added comprehensive keyboard navigation (arrow keys, home, end, delete, backspace)",
+        "Enhanced tab autocomplete with popup suggestions and keyboard navigation",
+        "Implemented command history navigation with up/down arrows",
+        "Added inline command prompt that updates per device",
+        "Removed separate input field for seamless terminal experience",
+        "Added proper text insertion at cursor position",
+        "Enhanced terminal focus management and click-to-focus functionality",
+        "Improved terminal scrolling and output positioning",
+        "Added support for multiple Enter key presses and blank lines",
+        "Enhanced autocomplete with device-specific command suggestions",
+        "Added visual feedback for connected devices in terminal prompt"
+      ]
+    },
+    {
+      "version": "1.2.0",
+      "date": "2025-01-28",
+      "changes": [
+        "MAJOR: Added comprehensive Serial Communication module with full device management",
+        "MAJOR: Implemented real-time serial terminal with tab autocomplete and command history",
+        "MAJOR: Added TCP-to-Serial bridge for external program connectivity",
+        "Added serial device discovery and connection management for USB, ACM, and built-in serial ports",
+        "Added WebSocket-based real-time serial communication with output streaming",
+        "Added serial command sending with dynamic autocomplete based on device type",
+        "Added serial output logging and download functionality",
+        "Added multi-device support with concurrent connections",
+        "Added device testing and connection verification tools",
+        "Added comprehensive error handling and connection status monitoring",
+        "Added pyserial dependency for robust serial communication",
+        "Added serial communication navigation link to main interface",
+        "Created modular serial communication architecture following application patterns",
+        "Added support for common baud rates and device configuration options",
+        "Added external program connectivity via TCP bridge server script"
+      ]
+    },
+    {
+      "version": "1.1.3",
+      "date": "2025-01-28",
+      "changes": [
+        "Added dedicated VNC status API endpoint (/vnc_status) for accurate server detection",
+        "Fixed VNC button state synchronization with actual server status",
+        "Enhanced VNC status checking to detect x11vnc, wayvnc, RealVNC, and TigerVNC servers",
+        "Fixed 'Show Connection Info' button functionality with proper error handling",
+        "Added comprehensive debugging for VNC element detection",
+        "Improved VNC status indicators to properly reflect running state",
+        "Fixed button visibility logic based on actual VNC server process status"
+      ]
+    },
+    {
+      "version": "1.1.2",
+      "date": "2025-01-28",
+      "changes": [
+        "Fixed VNC connection information display when VNC server is already running on page load",
+        "Added 'Show Connection Info' button for VNC section when server is running",
+        "Added automatic VNC status detection to show connection information for running servers",
+        "Enhanced VNC button visibility control for better user experience",
+        "Added click handler for VNC status area to manually show connection info",
+        "Improved VNC connection information visibility with proper initialization"
+      ]
+    },
+    {
+      "version": "1.1.1",
+      "date": "2025-01-21",
+      "changes": [
+        "Fixed VNC connection information display when starting VNC server",
+        "Added current connection interface highlighting with green indicator",
+        "Enhanced VNC address list with better visual styling and hover effects",
+        "Added loading indicators for VNC address detection",
+        "Improved debugging and error handling for VNC connection display",
+        "Added automatic scrolling to connection info when VNC starts",
+        "Enhanced connection list to clearly show which IP the user is currently connected from"
+      ]
+    },
+    {
+      "version": "1.1.0",
+      "date": "2025-01-21", 
+      "changes": [
+        "MAJOR: Removed noVNC web integration entirely for simplified VNC management",
+        "MAJOR: Streamlined VNC section to focus on native VNC client connections",
+        "Enhanced VNC server management with better compatibility detection",
+        "Added comprehensive VNC client recommendations and connection instructions",
+        "Improved VNC server startup with multiple fallback options (x11vnc, RealVNC, wayvnc, TigerVNC)",
+        "Enhanced VNC server stop functionality with proper service management",
+        "Simplified VNC interface to show connection information and setup guide",
+        "Removed web-based VNC viewer dependencies for better performance",
+        "Added step-by-step connection instructions for various platforms",
+        "Maintained multi-IP address display for external VNC client connections"
+      ]
+    },
+    {
+      "version": "1.0.9",
+      "date": "2025-01-21",
+      "changes": [
+        "MAJOR: Enhanced VNC section with comprehensive noVNC compatibility",
+        "MAJOR: Added multi-IP address display for VNC connections",
+        "Added noVNC viewer mode switching (Lite, Full, Auto Connect)",
+        "Added automatic system IP address detection and display",
+        "Enhanced VNC connection information with all available network interfaces",
+        "Added fallback IP detection methods for maximum compatibility",
+        "Improved VNC viewer controls with mode selection buttons",
+        "Enhanced VNC connection info layout with organized address listing",
+        "Added better error handling for network interface detection",
+        "Enhanced VNC functionality to show all relevant connection options"
+      ]
+    },
+    {
+      "version": "1.0.8",
+      "date": "2025-01-21",
+      "changes": [
+        "MAJOR: Enhanced Pi Control tab with Proxmox-like interface design",
+        "MAJOR: Added SSH Terminal button for native SSH client integration",
+        "MAJOR: Redesigned console section with improved status indicators",
+        "MAJOR: Enhanced VNC section with better connection management",
+        "Added SSH connection modal with copy-to-clipboard functionality",
+        "Added real-time connection status indicators for console and VNC",
+        "Added fullscreen button for VNC viewer",
+        "Enhanced terminal settings with real-time font size adjustment",
+        "Added comprehensive terminal theming (Green, Amber, White, Blue)",
+        "Improved terminal settings panel with better organization",
+        "Added dynamic scrollbar color theming to match terminal colors",
+        "Enhanced console header with connection status and control buttons",
+        "Improved VNC header with visual status indicators",
+        "Added connection information display for VNC sessions",
+        "Enhanced overall Pi Control tab layout and user experience"
+      ]
+    },
+    {
+      "version": "1.0.7",
+      "date": "2025-01-21",
+      "changes": [
+        "MAJOR: Added automatic network interface hotplug detection via udev rules",
+        "MAJOR: Implemented automatic eth0 activation when cables are plugged in",
+        "MAJOR: Enhanced services dashboard with detailed service information views",
+        "MAJOR: Added dedicated AnyDesk Remote Access panel to dashboard",
+        "Added comprehensive AnyDesk management with ID display, password setting, and status monitoring",
+        "Added AnyDesk installation functionality with one-click install button",
+        "Added dependency checking for AnyDesk (internet connectivity, display manager, firewall)",
+        "Added comprehensive service details with tabbed interface (Overview, Status, Logs, Configuration)",
+        "Added AnyDesk service support with priority monitoring for remote access",
+        "Added network hotplug handler script with automatic DHCP configuration",
+        "Added systemd timer for periodic network monitoring as fallback",
+        "Enhanced service information display with memory usage and auto-start status",
+        "Added installation and uninstallation scripts for hotplug system",
+        "Created comprehensive documentation for network hotplug detection",
+        "Created documentation for enhanced services dashboard",
+        "Added CSS styling for service details interface with dark mode support",
+        "Added CSS styling for AnyDesk panel with responsive grid layout",
+        "Implemented real-time UI notifications for network interface changes",
+        "Added AnyDesk ID copy-to-clipboard functionality",
+        "Added AnyDesk log viewing in modal dialog"
+      ]
+    },
+    {
+      "version": "1.0.6",
+      "date": "2025-04-21",
+      "changes": [
+        "Improved log display with consistent column alignment",
+        "Enhanced log readability with proper table structure",
+        "Improved expandable log entries for better detail viewing"
+      ]
+    },
     {
       "version": "1.0.5",
       "date": "2025-04-21",

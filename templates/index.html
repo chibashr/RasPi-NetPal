@@ -76,46 +76,59 @@
             <span class="section-toggle" data-target="connection-sharing" onclick="toggleSection('connection-sharing')">Hide</span>
         </h2>
         <div id="connection-sharing" class="card">
-            <p>Share internet connection between network interfaces</p>
-            
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
-                <div class="form-group">
-                    <label>Share Connection From:</label>
-                    <select id="source-interface" class="form-control">
-                        <option value="" disabled selected>Select Source Interface</option>
-                        <option value="usb0">USB Tethering (usb0)</option>
-                        <option value="eth0">Ethernet (eth0)</option>
-                    </select>
-                    <small class="form-help">Interface with internet connectivity</small>
+            <div id="sharing-inactive-view">
+                <p>Share internet connection between network interfaces</p>
+                
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;">
+                    <div class="form-group">
+                        <label>Share Connection From:</label>
+                        <select id="source-interface" class="form-control">
+                            <option value="" disabled selected>Select Source Interface</option>
+                            <option value="usb0">USB Tethering (usb0)</option>
+                            <option value="eth0">Ethernet (eth0)</option>
+                        </select>
+                        <small class="form-help">Interface with internet connectivity</small>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>Share To:</label>
+                        <select id="target-interface" class="form-control">
+                            <option value="" disabled selected>Select Target Interface</option>
+                            <option value="wlan0">Wi-Fi AP (wlan0)</option>
+                        </select>
+                        <small class="form-help">Interface to share connection with</small>
+                    </div>
                 </div>
                 
-                <div class="form-group">
-                    <label>Share To:</label>
-                    <select id="target-interface" class="form-control">
-                        <option value="" disabled selected>Select Target Interface</option>
-                        <option value="wlan0">Wi-Fi AP (wlan0)</option>
-                    </select>
-                    <small class="form-help">Interface to share connection with</small>
+                <div class="form-check" style="background-color: rgba(46, 204, 113, 0.1); padding: 10px; border-radius: 5px; border-left: 4px solid #2ecc71; margin-bottom: 15px;">
+                    <input type="checkbox" id="enable-nat" class="form-check-input" checked>
+                    <label for="enable-nat" class="form-check-label"><strong>Enable NAT (Network Address Translation)</strong></label>
+                    <p class="form-help" style="margin-top: 5px; margin-bottom: 0;">Allows devices connected to the target interface to access the internet through the source connection. DNS servers will be forwarded automatically.</p>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="apply-sharing" class="btn primary">Apply Sharing</button>
+                </div>
+                
+                <div class="help-text" style="margin-top: 0; padding: 10px; background-color: rgba(52, 152, 219, 0.1); border-radius: 5px; border-left: 4px solid #3498db;">
+                    <p style="margin: 0;"><strong>Note:</strong> When applying connection sharing, the AP will restart briefly. After reconnecting, you'll have 1 minute to confirm the settings, or they'll automatically revert to prevent lockouts.</p>
                 </div>
             </div>
             
-            <div class="form-check" style="background-color: rgba(46, 204, 113, 0.1); padding: 10px; border-radius: 5px; border-left: 4px solid #2ecc71; margin-bottom: 15px;">
-                <input type="checkbox" id="enable-nat" class="form-check-input" checked>
-                <label for="enable-nat" class="form-check-label"><strong>Enable NAT (Network Address Translation)</strong></label>
-                <p class="form-help" style="margin-top: 5px; margin-bottom: 0;">Allows devices connected to the target interface to access the internet through the source connection. DNS servers will be forwarded automatically.</p>
-            </div>
-            
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <button id="apply-sharing" class="btn primary">Apply Sharing</button>
-                <button id="stop-sharing" class="btn danger">Stop Sharing</button>
+            <div id="sharing-active-view" style="display: none;">
+                <div style="background-color: rgba(46, 204, 113, 0.1); padding: 15px; border-radius: 5px; border-left: 4px solid #2ecc71; margin-bottom: 15px;">
+                    <h3 style="margin-top: 0;">Connection Sharing Active</h3>
+                    <p id="sharing-details">Sharing <span id="sharing-source">eth0</span> to <span id="sharing-target">wlan0</span></p>
+                    <p id="sharing-nat-status">NAT: <span class="badge success">Enabled</span></p>
+                </div>
+                
+                <div style="display: flex; gap: 10px; margin-bottom: 15px;">
+                    <button id="stop-sharing" class="btn danger">Stop Sharing</button>
+                </div>
             </div>
             
             <div id="sharing-status" class="status-container" style="margin-bottom: 15px;">
                 <p>Status: <span class="badge error">Not Active</span></p>
-            </div>
-            
-            <div class="help-text" style="margin-top: 0; padding: 10px; background-color: rgba(52, 152, 219, 0.1); border-radius: 5px; border-left: 4px solid #3498db;">
-                <p style="margin: 0;"><strong>Note:</strong> When applying connection sharing, the AP will restart briefly. After reconnecting, you'll have 1 minute to confirm the settings, or they'll automatically revert to prevent lockouts.</p>
             </div>
         </div>
     </section>
@@ -152,6 +165,18 @@
                     </tr>
                 </tbody>
             </table>
+        </div>
+    </section>
+
+    <section>
+        <h2>
+            AnyDesk Remote Access
+            <span class="section-toggle" data-target="anydesk-section" onclick="toggleSection('anydesk-section')">Hide</span>
+        </h2>
+        <div id="anydesk-section" class="card">
+            <div id="anydesk-container">
+                <div class="loading"><span class="loading-spinner"></span> Loading AnyDesk status</div>
+            </div>
         </div>
     </section>
 
@@ -350,16 +375,40 @@ document.addEventListener('DOMContentLoaded', function() {
         .then(response => response.json())
         .then(data => {
             if (data.active) {
+                // Update status badge
                 sharingStatus.textContent = 'Active';
                 sharingStatus.className = 'badge success';
                 
-                // Set form values based on current configuration
+                // Update sharing details in active view
+                document.getElementById('sharing-source').textContent = data.source;
+                document.getElementById('sharing-target').textContent = data.target;
+                
+                // Update NAT status
+                const natStatusSpan = document.getElementById('sharing-nat-status').querySelector('span');
+                if (data.nat_enabled) {
+                    natStatusSpan.textContent = 'Enabled';
+                    natStatusSpan.className = 'badge success';
+                } else {
+                    natStatusSpan.textContent = 'Disabled';
+                    natStatusSpan.className = 'badge warning';
+                }
+                
+                // Switch to active view
+                document.getElementById('sharing-inactive-view').style.display = 'none';
+                document.getElementById('sharing-active-view').style.display = 'block';
+                
+                // Also set form values (they're hidden but we'll keep them updated)
                 sourceInterface.value = data.source;
                 targetInterface.value = data.target;
                 enableNat.checked = data.nat_enabled;
             } else {
+                // Update status badge
                 sharingStatus.textContent = 'Not Active';
                 sharingStatus.className = 'badge error';
+                
+                // Switch to inactive view
+                document.getElementById('sharing-inactive-view').style.display = 'block';
+                document.getElementById('sharing-active-view').style.display = 'none';
             }
         })
         .catch(error => {
@@ -413,14 +462,18 @@ window.testEndpoints = function() {
 <style>
 .loading-spinner {
     display: inline-block;
-    width: 16px;
-    height: 16px;
-    border: 3px solid rgba(0, 0, 0, 0.1);
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(0, 0, 0, 0.1);
     border-radius: 50%;
     border-top-color: var(--primary-color, #28a745);
     animation: spin 1s ease-in-out infinite;
-    margin-right: 8px;
+    margin-right: 6px;
     vertical-align: middle;
+    position: relative;
+    top: -1px;
+    min-width: 14px;
+    box-sizing: content-box;
 }
 
 @keyframes spin {
@@ -461,6 +514,47 @@ window.testEndpoints = function() {
 .network-table th, .network-table td {
     padding: 8px;
     text-align: left;
+}
+
+/* Badge styles */
+.badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: bold;
+    text-align: center;
+    white-space: nowrap;
+    line-height: 1.2;
+}
+
+.badge-success {
+    background-color: rgba(46, 204, 113, 0.2);
+    color: #27ae60;
+    border: 1px solid #27ae60;
+}
+
+.badge-danger {
+    background-color: rgba(231, 76, 60, 0.2);
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+}
+
+.badge-warning {
+    background-color: rgba(241, 196, 15, 0.2);
+    color: #f39c12;
+    border: 1px solid #f39c12;
+}
+
+.badge-info {
+    background-color: rgba(52, 152, 219, 0.2);
+    color: #3498db;
+    border: 1px solid #3498db;
+}
+
+/* Default route row highlight */
+.default-route-row {
+    background-color: rgba(46, 204, 113, 0.05);
 }
 
 /* Responsive design for mobile */

@@ -5,1424 +5,961 @@
 
 {% block extra_css %}
 <style>
-    .terminal-container {
-        background-color: #121212 !important;
-        color: #2ECC40 !important;
-        font-family: monospace !important;
-        padding: 10px 15px;
-        border-radius: 8px;
-        height: 400px;
-        overflow-y: scroll !important; /* Force scrolling */
+    .ssh-container {
+        display: grid;
+        grid-template-columns: 1fr 2fr;
+        gap: 20px;
         margin-bottom: 20px;
-        white-space: pre-wrap;
-        word-wrap: break-word;
-        position: relative;
-        cursor: text;
-        box-shadow: 0 0 15px rgba(46, 204, 64, 0.15) !important;
-        border: 1px solid #333 !important;
-        font-size: 14px;
-        line-height: 1.2;
-        letter-spacing: 0.5px;
-        overflow-x: auto; /* Allow horizontal scrolling if needed */
-        transition: border-color 0.3s ease;
-        -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
-        scrollbar-width: thin; /* Firefox */
-        scrollbar-color: #2ECC40 #121212; /* Firefox */
     }
     
-    /* Customize scrollbars for webkit browsers */
-    .terminal-container::-webkit-scrollbar {
-        width: 8px;
-        height: 8px;
-    }
-    
-    .terminal-container::-webkit-scrollbar-track {
-        background: #121212;
+    .session-list {
+        max-height: 400px;
+        overflow-y: auto;
+        border: 1px solid var(--border-color);
         border-radius: 4px;
+        margin-bottom: 15px;
     }
     
-    .terminal-container::-webkit-scrollbar-thumb {
-        background-color: #2ECC40;
-        border-radius: 4px;
-        border: 2px solid #121212;
+    .session-item {
+        padding: 15px;
+        border-bottom: 1px solid var(--border-color);
+        cursor: pointer;
+        transition: background-color 0.2s;
     }
     
-    .terminal-container.focused {
-        border-color: #2ECC40 !important;
-        box-shadow: 0 0 20px rgba(46, 204, 64, 0.25) !important;
+    .session-item:hover {
+        background: var(--hover-color);
     }
     
-    /* Terminal effects */
-    .terminal-scanlines {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0) 50%);
-        background-size: 100% 4px;
-        pointer-events: none;
-        opacity: 0.3;
-        z-index: 2;
+    .session-item.connected {
+        background: #28a745 !important;
+        color: white !important;
     }
     
-    .terminal-glow {
-        position: absolute;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: radial-gradient(ellipse at center, rgba(51, 255, 51, 0.05) 0%, rgba(0, 0, 0, 0.2) 100%);
-        pointer-events: none;
-        z-index: 1;
+    .session-item.connected .session-path {
+        color: #e6ffe9 !important;
     }
     
-    .terminal-cursor {
-        display: inline-block;
-        width: 8px;
-        height: 16px;
-        background-color: #2ECC40;
-        animation: blink 1s step-end infinite;
-        vertical-align: middle;
-        margin-left: 1px;
-        position: relative;
-    }
-    
-    .terminal-cursor.focus-lost {
-        opacity: 0.3;
-        animation: none;
-    }
-    
-    @keyframes blink {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0; }
-    }
-    
-    .terminal-input-wrapper {
-        position: relative;
-        display: flex;
-        flex-direction: row;
-        min-height: 18px;
-        line-height: 18px;
-        align-items: center;
-    }
-    
-    .terminal-input-text {
-        flex-grow: 1;
-        color: #2ECC40;
-        background: transparent;
-        white-space: pre;
-        font-family: monospace;
-        display: inline-block;
-    }
-
-    .terminal-prompt {
-        color: #2ECC40 !important;
-        margin-right: 5px;
-        display: inline-block;
+    .session-item.connected .session-name {
+        color: white !important;
         font-weight: bold;
     }
     
-    .terminal-input-inline {
-        background-color: transparent !important;
-        color: transparent !important;
-        caret-color: transparent !important;
-        border: none !important;
-        font-family: monospace !important;
-        outline: none !important;
-        width: 1px !important;
-        height: 1px !important;
-        position: absolute !important;
-        opacity: 0.01 !important;
-        z-index: -1;
+    .session-item.selected {
+        background: #007bff !important;
+        color: white !important;
     }
     
-    .controls-row {
+    .session-item.selected .session-path {
+        color: #e6f3ff !important;
+    }
+    
+    .session-item.selected .session-name {
+        color: white !important;
+        font-weight: bold;
+    }
+    
+    .session-info {
         display: flex;
         justify-content: space-between;
+        align-items: center;
+    }
+    
+    .session-details {
+        flex: 1;
+    }
+    
+    .session-name {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+    
+    .session-path {
+        font-size: 0.9em;
+        color: var(--text-muted);
+    }
+    
+    .session-status {
+        text-align: right;
+    }
+    
+    .status-indicator {
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        margin-left: 10px;
+    }
+    
+    .status-connected {
+        background: #28a745;
+    }
+    
+    .status-disconnected {
+        background: #dc3545;
+    }
+    
+    .control-row {
+        display: flex;
+        gap: 10px;
         align-items: center;
         margin-bottom: 10px;
     }
     
-    .controls-row .btn-group {
-        display: flex;
-        gap: 10px;
-    }
-    
-    /* Custom clear button for terminal */
-    #clear-terminal {
-        background-color: #444 !important;
-        color: #eee !important;
-        border: 1px solid #333 !important;
-        border-radius: 4px;
-        padding: 5px 10px;
-        cursor: pointer;
-        font-size: 12px;
-        transition: all 0.2s;
-    }
-    
-    #clear-terminal:hover {
-        background-color: #555 !important;
-    }
-    
-    /* Hide default button styles */
-    .btn.secondary {
-        background: none;
-        border: none;
-    }
-    
-    /* Rest of your existing styles */
-    .control-panel {
-        display: flex;
-        flex-direction: column;
-        gap: 15px;
-        margin-bottom: 20px;
-    }
-    
-    .control-section {
-        background-color: var(--card-bg);
-        border-radius: 5px;
+    .terminal-container {
+        background: #000;
+        color: #00ff00;
+        font-family: 'Courier New', monospace;
         padding: 15px;
-        box-shadow: 0 2px 5px rgba(0,0,0,0.1);
-    }
-    
-    .control-section h3 {
-        margin-top: 0;
-        border-bottom: 1px solid var(--border-color);
-        padding-bottom: 10px;
+        border-radius: 4px;
+        overflow-y: auto;
+        overflow-x: hidden;
+        height: 500px;
         margin-bottom: 15px;
+        border: 2px solid #333;
+        position: relative;
+        cursor: text;
+        max-height: 70vh;
+        word-wrap: break-word;
+        white-space: pre-wrap;
     }
     
-    .vnc-viewer {
+    .terminal-container:focus {
+        outline: none;
+        border-color: #555;
+    }
+    
+    .terminal-line {
+        margin: 0;
+        white-space: pre-wrap;
+        word-wrap: break-word;
+        line-height: 1.2;
+    }
+    
+    .module-card {
+        background: var(--card-bg);
         border: 1px solid var(--border-color);
         border-radius: 5px;
-        width: 100%;
-        height: 500px;
-        display: none;
+        margin-bottom: 20px;
+        overflow: hidden;
     }
     
-    .tab-nav {
-        display: flex;
-        margin-bottom: 15px;
+    .module-card-header {
+        background: var(--table-header-bg);
+        padding: 15px;
         border-bottom: 1px solid var(--border-color);
     }
     
-    .tab-btn {
-        padding: 10px 15px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        border-bottom: 3px solid transparent;
+    .module-card-header h3 {
+        margin: 0;
         color: var(--text-color);
+        font-size: 16px;
+        font-weight: 500;
     }
     
-    .tab-btn.active {
-        border-bottom: 3px solid var(--accent-color);
-        font-weight: bold;
+    .module-card-body {
+        padding: 15px;
     }
     
-    .tab-content {
-        display: none;
+    .form-field {
+        margin-bottom: 15px;
     }
     
-    .tab-content.active {
+    .form-field label {
         display: block;
-    }
-
-    .dark-mode .terminal-container {
-        background-color: #0d0d0d;
-        color: #33ff33;
-        box-shadow: 0 0 10px rgba(0, 255, 0, 0.2), inset 0 0 30px rgba(0, 0, 0, 0.5);
-    }
-    
-    .dark-mode .terminal-input {
-        background-color: #0d0d0d;
-        color: #33ff33;
-        border-color: #444;
-    }
-    
-    /* Focus indicator */
-    .terminal-focus-message {
-        position: absolute;
-        bottom: 15px;
-        right: 15px;
-        background-color: rgba(0, 0, 0, 0.7);
-        color: #2ECC40;
-        padding: 5px 10px;
-        border-radius: 4px;
-        font-size: 12px;
-        opacity: 0;
-        transition: opacity 0.3s ease;
-        pointer-events: none;
-        z-index: 10;
-    }
-    
-    .terminal-focus-message.visible {
-        opacity: 1;
-    }
-
-    .focus-message {
-        position: absolute;
-        bottom: 10px;
-        right: 10px;
-        background-color: rgba(0, 0, 0, 0.8);
-        color: #2ECC40;
-        padding: 8px 12px;
-        border-radius: 4px;
-        font-size: 14px;
-        z-index: 100;
-        border: 1px solid #2ECC40;
-        box-shadow: 0 0 10px rgba(46, 204, 64, 0.5);
-        pointer-events: none;
-    }
-    
-    /* Network Scan Styles */
-    .form-row {
-        display: flex;
-        gap: 15px;
-        margin-bottom: 15px;
-    }
-    
-    .form-group {
-        display: flex;
-        flex-direction: column;
-        margin-bottom: 15px;
-    }
-    
-    .form-group label {
         margin-bottom: 5px;
+        color: var(--text-color);
         font-weight: 500;
     }
     
     .form-control {
+        width: 100%;
         padding: 8px 12px;
         border: 1px solid var(--border-color);
         border-radius: 4px;
-        background-color: var(--input-bg);
+        background: var(--input-bg);
         color: var(--text-color);
+        font-size: 14px;
     }
     
-    .progress-bar {
-        height: 10px;
-        background-color: #eee;
-        border-radius: 5px;
-        overflow: hidden;
-        margin-bottom: 10px;
+    .form-control:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
     }
     
-    .progress-fill {
-        height: 100%;
-        background-color: var(--accent-color);
-        width: 100%;
-        animation: progress-animation 1.5s infinite;
-    }
-    
-    @keyframes progress-animation {
-        0% { transform: translateX(-100%); }
-        100% { transform: translateX(100%); }
-    }
-    
-    .table {
-        width: 100%;
-        border-collapse: collapse;
-        margin-bottom: 20px;
-    }
-    
-    .table th, .table td {
-        padding: 8px 12px;
-        text-align: left;
-        border-bottom: 1px solid var(--border-color);
-    }
-    
-    .table th {
-        background-color: var(--table-header-bg);
-        color: var(--text-color);
+    .button {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 14px;
         font-weight: 500;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        transition: all 0.2s ease;
     }
     
-    .table-responsive {
-        overflow-x: auto;
+    .button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+    
+    .button-primary {
+        background: #007bff;
+        color: white;
+    }
+    
+    .button-primary:hover {
+        background: #0056b3;
+    }
+    
+    .button-success {
+        background: #28a745;
+        color: white;
+    }
+    
+    .button-success:hover {
+        background: #1e7e34;
+    }
+    
+    .button-warning {
+        background: #ffc107;
+        color: #212529;
+    }
+    
+    .button-warning:hover {
+        background: #e0a800;
+    }
+    
+    .button-danger {
+        background: #dc3545;
+        color: white;
+    }
+    
+    .button-danger:hover {
+        background: #c82333;
+    }
+    
+    .button-secondary {
+        background: #6c757d;
+        color: white;
+    }
+    
+    .button-secondary:hover {
+        background: #545b62;
+    }
+    
+    .auth-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0,0,0,0.8);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 10000;
+    }
+    
+    .auth-modal-content {
+        background: var(--card-bg);
+        padding: 30px;
+        border-radius: 8px;
+        max-width: 400px;
+        width: 90%;
+        color: var(--text-color);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    }
+    
+    .auth-form {
+        margin-top: 20px;
+    }
+    
+    .error-message {
+        color: #dc3545;
+        margin-top: 10px;
+        font-size: 14px;
+    }
+    
+    .success-message {
+        color: #28a745;
+        margin-top: 10px;
+        font-size: 14px;
+    }
+    
+    .terminal-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
         margin-bottom: 15px;
+        padding: 10px;
+        background: var(--card-bg);
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
     }
     
-    /* Dark mode adjustments */
-    .dark-mode .form-control {
-        background-color: #333;
-        color: #fff;
-        border-color: #444;
-    }
-    
-    .dark-mode .progress-bar {
-        background-color: #444;
-    }
-    
-    .dark-mode .table th {
-        background-color: #333;
+    .selected-session-info {
+        font-weight: bold;
+        color: var(--text-color);
     }
 </style>
 {% endblock %}
 
-{% block extra_js %}
-<script src="{{ url_for('static', filename='js/socket.io.min.js') }}"></script>
-<script>
-    // Force CSS reload by adding timestamp to CSS links
-    document.addEventListener('DOMContentLoaded', function() {
-        const timestamp = new Date().getTime();
-        const links = document.getElementsByTagName('link');
-        for (let i = 0; i < links.length; i++) {
-            if (links[i].rel === 'stylesheet') {
-                links[i].href = links[i].href + '?t=' + timestamp;
-            }
-        }
-    });
-</script>
+{% block content %}
+<div class="container">
+    <div class="page-header">
+        <h1>Pi Control - SSH Terminal Access</h1>
+        <p>Connect to SSH sessions with username and password authentication, similar to PuTTY.</p>
+    </div>
+    
+    <div class="ssh-container">
+        <!-- Left Panel - Session Management -->
+        <div class="session-panel">
+            <!-- Session List -->
+            <div class="module-card">
+                <div class="module-card-header">
+                    <h3>SSH Sessions</h3>
+                </div>
+                <div class="module-card-body">
+                    <div class="control-row">
+                        <button class="button button-primary" id="new-session-btn" onclick="showAuthModal()">
+                            <i class="fas fa-plus"></i> New SSH Session
+                        </button>
+                        <button class="button button-secondary" onclick="refreshSessions()">
+                            <i class="fas fa-sync"></i> Refresh
+                        </button>
+                    </div>
+                    
+                    <div class="session-list" id="session-list">
+                        <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+                            No SSH sessions active<br>
+                            <small>Click "New SSH Session" to connect</small>
+                    </div>
+                </div>
+            </div>
+            </div>
+            
+            <!-- Connection Controls -->
+            <div class="module-card">
+                <div class="module-card-header">
+                    <h3>Session Controls</h3>
+                    </div>
+                <div class="module-card-body">
+                    <div class="control-row">
+                        <button class="button button-danger" id="disconnect-btn" onclick="disconnectSession()" disabled>
+                            <i class="fas fa-unlink"></i> Disconnect
+                        </button>
+                        <button class="button button-danger" onclick="disconnectAll()">
+                            <i class="fas fa-power-off"></i> Disconnect All
+                        </button>
+                    </div>
+            </div>
+        </div>
+    </div>
+    
+        <!-- Right Panel - Terminal -->
+        <div class="terminal-panel">
+            <div class="module-card">
+                <div class="module-card-header">
+                    <h3>SSH Terminal</h3>
+                </div>
+                <div class="module-card-body">
+                    <div class="terminal-controls">
+                        <div class="terminal-buttons">
+                            <button class="button button-secondary" onclick="clearTerminal()">
+                                <i class="fas fa-eraser"></i> Clear
+                            </button>
+                            <button class="button button-primary" onclick="downloadOutput()" id="download-btn" disabled>
+                                <i class="fas fa-download"></i> Download Log
+                            </button>
+                </div>
+                        <div class="selected-session-info" id="selected-session-info">
+                            No session selected
+            </div>
+                    </div>
+                    
+                    <div class="terminal-container" id="terminal-output" tabindex="0">
+                        <div class="terminal-line">SSH Terminal Console</div>
+                        <div class="terminal-line">Select a session from the left panel or create a new SSH connection.</div>
+                        <div class="terminal-line"></div>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+<!-- SSH Authentication Modal -->
+<div id="auth-modal" class="auth-modal" style="display: none;">
+    <div class="auth-modal-content">
+        <h3 style="margin-top: 0; color: #007bff;">New SSH Connection</h3>
+        <p>Enter your SSH credentials to connect:</p>
+        
+        <form class="auth-form" id="auth-form">
+            <div class="form-field">
+                <label for="ssh-host">Host:</label>
+                <input type="text" id="ssh-host" class="form-control" value="localhost" required>
+            </div>
+            
+            <div class="form-field">
+                <label for="ssh-port">Port:</label>
+                <input type="number" id="ssh-port" class="form-control" value="22" min="1" max="65535" required>
+            </div>
+            
+            <div class="form-field">
+                <label for="ssh-username">Username:</label>
+                <input type="text" id="ssh-username" class="form-control" placeholder="pi" required>
+            </div>
+            
+            <div class="form-field">
+                <label for="ssh-password">Password:</label>
+                <input type="password" id="ssh-password" class="form-control" placeholder="Enter password" required>
+            </div>
+            
+            <div id="auth-message"></div>
+            
+            <div style="text-align: right; margin-top: 20px; display: flex; gap: 10px; justify-content: flex-end;">
+                <button type="button" class="button button-secondary" onclick="hideAuthModal()">Cancel</button>
+                <button type="button" class="button button-primary" onclick="testConnection()">Test Connection</button>
+                <button type="submit" class="button button-success">Connect</button>
+                </div>
+        </form>
+                </div>
+</div>
+
 {% endblock %}
 
-{% block content %}
-<div class="card">
-    <h2>Raspberry Pi Control</h2>
-    <p>Manage your Raspberry Pi with direct console and VNC access</p>
-    
-    <div class="tab-nav">
-        <button class="tab-btn active" data-tab="console">Console</button>
-        <button class="tab-btn" data-tab="vnc">VNC</button>
-    </div>
-    
-    <div class="tab-content active" id="console-tab">
-        <div class="control-section">
-            <h3>Console Access</h3>
-            <p>Interact directly with the Raspberry Pi command line.</p>
-            
-            <div id="terminal" class="terminal-container" tabindex="0" style="background-color: #121212; color: #2ECC40; font-family: monospace; box-shadow: 0 0 15px rgba(46, 204, 64, 0.15); border: 1px solid #333;">
-                <div class="terminal-scanlines" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: linear-gradient(rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0) 50%); background-size: 100% 4px; opacity: 0.3; z-index: 2; pointer-events: none;"></div>
-                <div class="terminal-glow" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(ellipse at center, rgba(46, 204, 64, 0.07) 0%, rgba(0, 0, 0, 0.2) 100%); pointer-events: none; z-index: 1;"></div>
-            </div>
-            
-            <div class="controls-row">
-                <div class="btn-group">
-                    <button id="clear-terminal" class="btn secondary" style="background-color: #444; color: #eee; border: 1px solid #333;">Clear</button>
-                    <button id="settings-toggle" class="btn secondary" style="background-color: #444; color: #eee; border: 1px solid #333;">Settings</button>
-                    <button id="download-output" class="btn secondary" style="background-color: #444; color: #eee; border: 1px solid #333;">Download Output</button>
-                </div>
-            </div>
-            
-            <!-- Terminal Settings Panel -->
-            <div id="terminal-settings" class="terminal-settings" style="display: none; margin-top: 15px; background: #222; border: 1px solid #333; border-radius: 4px; padding: 15px;">
-                <h4 style="margin-top: 0; color: #eee; border-bottom: 1px solid #444; padding-bottom: 10px;">Terminal Settings</h4>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                    <div>
-                        <label for="terminal-font-size" style="display: block; margin-bottom: 5px; color: #eee;">Font Size</label>
-                        <select id="terminal-font-size" class="terminal-setting" data-setting="fontSize" style="width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 5px; border-radius: 3px;">
-                            <option value="12px">Small (12px)</option>
-                            <option value="14px" selected>Medium (14px)</option>
-                            <option value="16px">Large (16px)</option>
-                            <option value="18px">Extra Large (18px)</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label for="terminal-color-scheme" style="display: block; margin-bottom: 5px; color: #eee;">Color Scheme</label>
-                        <select id="terminal-color-scheme" class="terminal-setting" data-setting="colorScheme" style="width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 5px; border-radius: 3px;">
-                            <option value="green" selected>Green (Classic)</option>
-                            <option value="amber">Amber</option>
-                            <option value="white">White</option>
-                            <option value="blue">Blue</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label for="terminal-cursor-style" style="display: block; margin-bottom: 5px; color: #eee;">Cursor Style</label>
-                        <select id="terminal-cursor-style" class="terminal-setting" data-setting="cursorStyle" style="width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 5px; border-radius: 3px;">
-                            <option value="block" selected>Block</option>
-                            <option value="underline">Underline</option>
-                            <option value="bar">Bar</option>
-                        </select>
-                    </div>
-                    
-                    <div>
-                        <label for="terminal-cursor-blink" style="display: block; margin-bottom: 5px; color: #eee;">Cursor Blink</label>
-                        <select id="terminal-cursor-blink" class="terminal-setting" data-setting="cursorBlink" style="width: 100%; background: #333; color: #eee; border: 1px solid #444; padding: 5px; border-radius: 3px;">
-                            <option value="true" selected>On</option>
-                            <option value="false">Off</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="tab-content" id="vnc-tab">
-        <div class="control-section">
-            <h3>VNC Access</h3>
-            <p>Remote desktop access to your Raspberry Pi.</p>
-            
-            <div class="controls-row">
-                <div>
-                    <span id="vnc-status">VNC Server: <span class="badge error">Not Running</span></span>
-                </div>
-                <div class="btn-group">
-                    <button id="start-vnc" class="btn primary">Start VNC Server</button>
-                    <button id="stop-vnc" class="btn danger" style="display: none;">Stop VNC Server</button>
-                </div>
-            </div>
-            
-            <div id="vnc-viewer-container" style="margin-top: 20px; display: none;">
-                <p>VNC display:</p>
-                <iframe id="vnc-iframe" class="vnc-viewer" style="display: block; width: 100%; height: 600px; border: 1px solid #ccc;"></iframe>
-                
-                <p style="margin-top: 10px;"><small>Note: If the embedded viewer doesn't work, connect with your favorite VNC client:</small></p>
-                <ul style="margin-top: 5px;">
-                    <li>Host: <span id="vnc-host">localhost</span></li>
-                    <li>Port: <span id="vnc-port">6080</span></li>
-                </ul>
-            </div>
-        </div>
-    </div>
-</div>
+{% block extra_js %}
+<!-- Include Socket.IO -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
 {% endblock %}
 
 {% block scripts %}
 <script>
-    // Tab navigation
-    document.querySelectorAll('.tab-btn').forEach(button => {
-        button.addEventListener('click', () => {
-            // Remove active class from all buttons and tabs
-            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
-            
-            // Add active class to clicked button and corresponding tab
-            button.classList.add('active');
-            document.getElementById(`${button.dataset.tab}-tab`).classList.add('active');
-        });
+    // Global variables
+    let socket;
+    let selectedSession = null;
+    let sessions = [];
+    let currentSessionId = null;
+    
+    // Terminal management 
+    let sessionTerminals = {}; // session_id -> {content: [], inputEnabled: false}
+    
+    // Terminal settings
+    let terminalSettings = {
+        fontSize: 14,
+        colorScheme: 'green-on-black',
+        autoScroll: true
+    };
+    
+    // Initialize the application
+    document.addEventListener('DOMContentLoaded', function() {
+        initializeSocket();
+        initializeEventListeners();
+        refreshSessions();
     });
     
-    // Console functionality
-    const terminal = document.getElementById('terminal');
-    const terminalInput = document.createElement('input');
-    terminalInput.type = 'text';
-    terminalInput.className = 'terminal-input-inline';
-    terminalInput.setAttribute('aria-label', 'Terminal input');
-    terminalInput.setAttribute('autocomplete', 'off');
-    terminalInput.setAttribute('spellcheck', 'false');
-    
-    let socket = null;
-    let commandHistory = [];
-    let historyPosition = -1;
-    
-    // Initialize with default values that will be updated when connected
-    let hostname = 'raspberrypi';
-    let username = 'admin';
-    let currentPrompt = 'admin@raspberrypi:/opt/captive$ ';
-    let currentDirectory = '/opt/captive';
-    let currentUser = `${username}@${hostname}`;
-    
-    let terminalContent = '';
-    let isProcessingCommand = false;
-    
-    function updatePrompt(directory) {
-        if (directory) {
-            currentDirectory = directory;
-        }
-        
-        // Format the prompt like a real bash shell: username@hostname:directory$
-        currentUser = `${username}@${hostname}`;
-        currentPrompt = `${currentUser}:${currentDirectory}$ `;
-        console.log("Updated prompt to:", currentPrompt);
-        
-        return currentPrompt;
-    }
-    
-    function setupWebSocket() {
-        // Close existing socket if any
-        if (socket) {
-            socket.disconnect();
-            socket = null;
-        }
-        
-        // Show connecting message
-        terminal.innerHTML = '<div class="terminal-scanlines"></div><div class="terminal-glow"></div>Connecting to console...';
-        terminalContent = 'Connecting to console...\n';
-        
-        // Apply styles to the terminal effects
-        const scanlines = terminal.querySelector('.terminal-scanlines');
-        const glow = terminal.querySelector('.terminal-glow');
-        
-        if (scanlines) {
-            scanlines.style.position = 'absolute';
-            scanlines.style.top = '0';
-            scanlines.style.left = '0';
-            scanlines.style.width = '100%';
-            scanlines.style.height = '100%';
-            scanlines.style.background = 'linear-gradient(rgba(0, 0, 0, 0.15) 50%, rgba(0, 0, 0, 0) 50%)';
-            scanlines.style.backgroundSize = '100% 4px';
-            scanlines.style.opacity = '0.3';
-            scanlines.style.zIndex = '2';
-            scanlines.style.pointerEvents = 'none';
-        }
-        
-        if (glow) {
-            glow.style.position = 'absolute';
-            glow.style.top = '0';
-            glow.style.left = '0';
-            glow.style.width = '100%';
-            glow.style.height = '100%';
-            glow.style.background = 'radial-gradient(ellipse at center, rgba(46, 204, 64, 0.07) 0%, rgba(0, 0, 0, 0.2) 100%)';
-            glow.style.pointerEvents = 'none';
-            glow.style.zIndex = '1';
-        }
-        
-        // Using Socket.IO instead of raw WebSocket with autoConnect: false
-        const socketOptions = { 
-            path: '/socket.io',
-            transports: ['websocket', 'polling'],
-            reconnectionAttempts: 10,
-            reconnectionDelay: 1000,
-            timeout: 20000,
-            autoConnect: false,
-            forceNew: true
-        };
-        
-        // Get the current host from the window location
+    // Initialize Socket.IO connection
+    function initializeSocket() {
         const currentHost = window.location.host;
         const currentProtocol = window.location.protocol;
         const socketUrl = `${currentProtocol}//${currentHost}`;
         
-        // Generate a unique session ID if not already present
-        if (!window.sessionStorage.getItem('consoleSessionId')) {
-            window.sessionStorage.setItem('consoleSessionId', 
-                Math.random().toString(36).substring(2, 15) + 
-                Math.random().toString(36).substring(2, 15));
-        }
-        const sessionId = window.sessionStorage.getItem('consoleSessionId');
+        socket = io(`${socketUrl}/console`, {
+            path: '/socket.io',
+            transports: ['websocket', 'polling'],
+            reconnectionAttempts: 10,
+            reconnectionDelay: 1000,
+            timeout: 20000
+        });
         
-        // Add session ID to socket options
-        socketOptions.query = { 'sessionId': sessionId };
-        
-        socket = io(`${socketUrl}/console`, socketOptions);
-        
-        // Set up event handlers
+        // Socket event handlers
         socket.on('connect', function() {
-            console.log("Socket.IO connection established");
-            // Clear any existing error messages
-            terminalContent = '';
-            updateTerminalDisplay();
-            
-            // Force a command to ensure we get a prompt
-            setTimeout(() => {
-                socket.emit('message', 'echo "Console ready"');
-            }, 500);
+            console.log('Connected to SSH console WebSocket');
         });
         
-        socket.on('connect_error', function(error) {
-            console.error('Socket.IO Error:', error);
-            if (!terminalContent.includes('Error: Connection failed')) {
-                terminalContent += 'Error: Connection failed. Retrying...\n';
-                updateTerminalDisplay();
-            }
-            
-            // Retry connection after a delay
-            setTimeout(() => {
-                if (socket && !socket.connected) {
-                    socket.connect();
-                }
-            }, 2000);
+        socket.on('connection_ready', function(data) {
+            console.log('SSH console connection ready:', data);
         });
         
-        socket.on('message', function(data) {
-            console.log("Received data:", data);
-            
-            // Check if this is a directory change notification
-            if (data.startsWith('Changed directory to ')) {
-                const newDir = data.replace('Changed directory to ', '').trim();
-                console.log("Directory changed to:", newDir);
-                updatePrompt(newDir);
-                
-                // Don't add directory change messages to terminal content
-                isProcessingCommand = false;
-                updateTerminalDisplay();
-                
-                // Scroll to the bottom
-                terminal.scrollTop = terminal.scrollHeight;
-                
-                return;
+        socket.on('ssh_output', function(data) {
+            if (data.session_id === currentSessionId) {
+                addTerminalOutput(data.data);
             }
-            
-            // Handle the command output formatting
-            // Force proper line breaks for command output
-            let formattedData = data;
-            
-            // Check if this is ls command output without proper line breaks
-            const lastCommand = window.lastCommand || '';
-            
-            // Special handling for ls command output
-            if (isProcessingCommand && 
-                (lastCommand.trim() === 'ls' || lastCommand.startsWith('ls ')) && 
-                data.trim().length > 0) {
-                
-                // First check if data already has newlines
-                if (!data.includes('\n')) {
-                    // No newlines - this is probably all on one line
-                    // Split by common file patterns and add newlines
-                    formattedData = '';
-                    
-                    // Split by common patterns that should be on separate lines
-                    const items = data.split(/\s+/);
-                    
-                    for (let i = 0; i < items.length; i++) {
-                        if (items[i].trim()) {
-                            formattedData += items[i] + '\n';
-                        }
-                    }
-                } else {
-                    // Already has some newlines, but might need more formatting
-                    // Ensure each item is on its own line
-                    const lines = data.split('\n');
-                    formattedData = '';
-                    
-                    for (let i = 0; i < lines.length; i++) {
-                        const line = lines[i].trim();
-                        if (line) {
-                            // If this line has multiple items (space-separated), split them
-                            if (line.includes(' ') && !line.startsWith('-')) {
-                                const items = line.split(/\s+/);
-                                for (let j = 0; j < items.length; j++) {
-                                    if (items[j].trim()) {
-                                        formattedData += items[j] + '\n';
-                                    }
-                                }
-                            } else {
-                                formattedData += line + '\n';
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // Process the incoming data to maintain clean formatting
-            // Use the formatted data if available, otherwise use original data
-            const trimmedData = (formattedData || data).replace(/^\s+|\s+$/g, '');
-            
-            // Add to terminal content only if non-empty
-            if (trimmedData) {
-                if (terminalContent && !terminalContent.endsWith('\n')) {
-                    terminalContent += '\n' + trimmedData;
-                } else {
-                    terminalContent += trimmedData;
-                }
-            }
-            
-            // Update the terminal display
-            updateTerminalDisplay();
-            
-            // Scroll to the bottom
-            terminal.scrollTop = terminal.scrollHeight;
+            // Also store output for session
+            addSessionOutput(data.session_id, data.data);
         });
         
-        socket.on('command_complete', function() {
-            // Command is complete, mark as not processing and update display
-            isProcessingCommand = false;
-            
-            // Ensure we end with a newline for clean prompt separation
-            if (terminalContent && !terminalContent.endsWith('\n')) {
-                terminalContent += '\n';
-            }
-            
-            // Reset lastCommand as the command is now complete
-            window.lastCommand = '';
-            
-            updateTerminalDisplay();
-            
-            // Ensure input focus
-            terminalInput.focus();
+        socket.on('session_list', function(data) {
+            updateSessionList(data.sessions);
+        });
+        
+        socket.on('error', function(data) {
+            addTerminalOutput(`Error: ${data.message}\n`, 'error');
         });
         
         socket.on('disconnect', function() {
-            console.log("Socket disconnected");
-            terminalContent += '\nConnection closed. Reconnecting...\n';
-            updateTerminalDisplay();
-            
-            // Attempt to reconnect after delay
-            setTimeout(function() {
-                // Connect only if not already connected
-                if (socket && !socket.connected) {
-                    socket.connect();
-                }
-            }, 2000);
+            console.log('Disconnected from SSH console WebSocket');
+        });
+    }
+    
+    // Initialize event listeners
+    function initializeEventListeners() {
+        // Terminal keyboard input
+        const terminal = document.getElementById('terminal-output');
+        terminal.addEventListener('keydown', function(event) {
+            if (currentSessionId && selectedSession && selectedSession.connected) {
+                handleTerminalInput(event);
+            }
         });
         
-        // Connect after setting up handlers
-        socket.connect();
+        // Auth form submission
+        document.getElementById('auth-form').addEventListener('submit', function(event) {
+            event.preventDefault();
+            connectSSH();
+        });
         
-        // Add focus message element to terminal
-        const focusMessage = document.createElement('div');
-        focusMessage.className = 'terminal-focus-message';
-        focusMessage.textContent = 'Click to resume';
-        terminal.appendChild(focusMessage);
+        // Close modal when clicking outside
+        document.getElementById('auth-modal').addEventListener('click', function(event) {
+            if (event.target === this) {
+                hideAuthModal();
+            }
+        });
     }
     
-    // Function to format the terminal content with proper line breaks
-    function formatTerminalContent() {
-        // This helps ensure proper line breaks for different command outputs
-        let formatted = terminalContent;
+    // Handle terminal keyboard input (PuTTY-like)
+    function handleTerminalInput(event) {
+        if (!currentSessionId) return;
         
-        // Look for patterns that suggest we need to add line breaks
+        let charToSend = null;
         
-        // First, detect multi-column outputs and convert them to single-column
-        // This pattern looks for multiple words separated by multiple spaces (typical of ls -l output)
-        const columnPattern = /([^\s]+)(\s{2,})([^\s]+)/g;
-        while (columnPattern.test(formatted)) {
-            formatted = formatted.replace(columnPattern, '$1\n$3');
-        }
+        // Prevent default for most keys
+        event.preventDefault();
         
-        // Handle special case for file listings from "ls" command
-        // Convert file listings with no breaks to properly formatted listings
-        const fileListPattern = /(^|\n)([\w\-\.]+)\s+([\w\-\.]+)/g;
-        formatted = formatted.replace(fileListPattern, '$1$2\n$3');
-        
-        // Apply specific formatting for common Linux commands
-        if (formatted.includes(' ls') || formatted.includes('$ ls')) {
-            // For ls command output, ensure each file/directory is on its own line
-            const lines = formatted.split('\n');
-            for (let i = 0; i < lines.length; i++) {
-                // If this line contains the 'ls' command, check the next line
-                if (lines[i].includes(' ls') || lines[i].includes('$ ls')) {
-                    // If the next line exists and doesn't have proper line breaks
-                    if (i + 1 < lines.length && lines[i + 1].trim().length > 0 && !lines[i + 1].includes('\n')) {
-                        // Split the output by whitespace and join with newlines
-                        const outputParts = lines[i + 1].trim().split(/\s+/);
-                        if (outputParts.length > 1) {
-                            lines[i + 1] = outputParts.join('\n');
-                        }
+        // Handle special keys
+        switch(event.key) {
+            case 'Enter':
+                charToSend = '\r';
+                break;
+            case 'Backspace':
+                charToSend = '\b';
+                break;
+            case 'Delete':
+                charToSend = '\x7f';
+                break;
+            case 'Tab':
+                charToSend = '\t';
+                break;
+            case 'Escape':
+                charToSend = '\x1b';
+                break;
+            case 'ArrowUp':
+                charToSend = '\x1b[A';
+                break;
+            case 'ArrowDown':
+                charToSend = '\x1b[B';
+                break;
+            case 'ArrowRight':
+                charToSend = '\x1b[C';
+                break;
+            case 'ArrowLeft':
+                charToSend = '\x1b[D';
+                break;
+            case 'Home':
+                charToSend = '\x1b[H';
+                break;
+            case 'End':
+                charToSend = '\x1b[F';
+                break;
+            case 'PageUp':
+                charToSend = '\x1b[5~';
+                break;
+            case 'PageDown':
+                charToSend = '\x1b[6~';
+                break;
+            case 'Insert':
+                charToSend = '\x1b[2~';
+                break;
+            default:
+                // Handle Ctrl combinations
+                if (event.ctrlKey) {
+                    if (event.key >= 'a' && event.key <= 'z') {
+                        charToSend = String.fromCharCode(event.key.charCodeAt(0) - 96);
+                    } else if (event.key === 'c') {
+                        charToSend = '\x03'; // Ctrl+C
+                    } else if (event.key === 'd') {
+                        charToSend = '\x04'; // Ctrl+D
+                    } else if (event.key === 'z') {
+                        charToSend = '\x1a'; // Ctrl+Z
+                    }
+                } else {
+                    // Regular printable characters
+                    if (event.key.length === 1) {
+                        charToSend = event.key;
                     }
                 }
-            }
-            formatted = lines.join('\n');
+                break;
         }
         
-        return formatted;
+        // Send the character to the SSH session
+        if (charToSend !== null) {
+            socket.emit('send_data', {
+                session_id: currentSessionId,
+                data: charToSend
+            });
+        }
     }
     
-    function updateTerminalDisplay() {
-        // Preserve the scanlines and glow
-        const scanlines = terminal.querySelector('.terminal-scanlines');
-        const glow = terminal.querySelector('.terminal-glow');
+    // Session management functions
+    function getCurrentSessionTerminal() {
+        return currentSessionId ? getOrCreateSessionTerminal(currentSessionId) : null;
+    }
+    
+    function getOrCreateSessionTerminal(sessionId) {
+        if (!sessionTerminals[sessionId]) {
+            sessionTerminals[sessionId] = {
+                content: [],
+                inputEnabled: false
+            };
+        }
+        return sessionTerminals[sessionId];
+    }
+    
+    function addSessionOutput(sessionId, data) {
+        const sessionTerminal = getOrCreateSessionTerminal(sessionId);
+        sessionTerminal.content.push(data);
         
-        // Reset terminal 
+        // Keep only last 1000 lines per session
+        if (sessionTerminal.content.length > 1000) {
+            sessionTerminal.content = sessionTerminal.content.slice(-1000);
+        }
+    }
+    
+    function loadSessionTerminal(sessionId) {
+        const terminal = document.getElementById('terminal-output');
+        const sessionTerminal = getOrCreateSessionTerminal(sessionId);
+        
+        // Clear current terminal display
         terminal.innerHTML = '';
         
-        // Re-add styling elements
-        if (scanlines) terminal.appendChild(scanlines);
-        if (glow) terminal.appendChild(glow);
+        // Load session history
+        sessionTerminal.content.forEach(content => {
+            const line = document.createElement('div');
+            line.className = 'terminal-line';
+            line.style.color = '#00ff00';
+            line.textContent = content;
+            terminal.appendChild(line);
+        });
         
-        // Create a div for the content
-        const contentDiv = document.createElement('div');
-        contentDiv.style.whiteSpace = 'pre-wrap';
-        contentDiv.style.marginBottom = '0'; // Remove space before prompt
-        contentDiv.style.lineHeight = '1.2'; // Consistent with container
+        scrollToBottom();
+    }
+    
+    function addTerminalOutput(data, type = 'normal') {
+        const terminal = document.getElementById('terminal-output');
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
         
-        // Apply any final formatting to the terminal content
-        let processedContent = applyOutputFormatting(terminalContent);
-        
-        contentDiv.textContent = processedContent;
-        terminal.appendChild(contentDiv);
-        
-        // Add prompt if not processing command
-        if (!isProcessingCommand) {
-            const promptDiv = document.createElement('div');
-            promptDiv.style.display = 'flex';
-            promptDiv.style.whiteSpace = 'nowrap';
-            promptDiv.style.alignItems = 'center';
-            promptDiv.style.marginTop = '0'; // No gap before prompt
-            
-            const promptSpan = document.createElement('span');
-            promptSpan.className = 'terminal-prompt';
-            promptSpan.textContent = currentPrompt;
-            promptDiv.appendChild(promptSpan);
-            
-            // Create an input wrapper with visible text and cursor
-            const inputWrapper = document.createElement('div');
-            inputWrapper.className = 'terminal-input-wrapper';
-            
-            // Get cursor position
-            const cursorPos = terminalInput.selectionStart || 0;
-            const inputValue = terminalInput.value || '';
-            
-            // Create a span for text before cursor
-            if (cursorPos > 0) {
-                const beforeCursorSpan = document.createElement('span');
-                beforeCursorSpan.className = 'terminal-input-text';
-                beforeCursorSpan.textContent = inputValue.substring(0, cursorPos);
-                inputWrapper.appendChild(beforeCursorSpan);
-            }
-            
-            // Create the blinking cursor
-            const cursor = document.createElement('span');
-            cursor.className = 'terminal-cursor';
-            inputWrapper.appendChild(cursor);
-            
-            // Create a span for text after cursor
-            if (cursorPos < inputValue.length) {
-                const afterCursorSpan = document.createElement('span');
-                afterCursorSpan.className = 'terminal-input-text';
-                afterCursorSpan.textContent = inputValue.substring(cursorPos);
-                inputWrapper.appendChild(afterCursorSpan);
-            }
-            
-            // Make sure input is not already in the DOM
-            if (terminalInput.parentNode) {
-                terminalInput.parentNode.removeChild(terminalInput);
-            }
-            
-            // Add the actual hidden input field
-            inputWrapper.appendChild(terminalInput);
-            promptDiv.appendChild(inputWrapper);
-            terminal.appendChild(promptDiv);
-            
-            // Ensure cursor is visible by forcing a reflow
-            setTimeout(() => {
-                // Focus the input
-                terminalInput.focus();
-                
-                // Ensure cursor position is preserved
-                terminalInput.selectionStart = terminalInput.selectionEnd = cursorPos;
-            }, 0);
+        switch(type) {
+            case 'error':
+                line.style.color = '#ff0000';
+                        break;
+            case 'success':
+                line.style.color = '#00ff00';
+                break;
+            case 'info':
+                line.style.color = '#ffff00';
+                break;
+            default:
+                line.style.color = '#00ff00';
         }
         
-        // Scroll to the bottom
+        line.textContent = data;
+        terminal.appendChild(line);
+        
+        scrollToBottom();
+    }
+    
+    function scrollToBottom() {
+        const terminal = document.getElementById('terminal-output');
         terminal.scrollTop = terminal.scrollHeight;
     }
     
-    // New advanced function to handle terminal output formatting
-    function applyOutputFormatting(content) {
-        // Process the content to ensure proper formatting
-        let formatted = content;
-        
-        // First, normalize newlines
-        formatted = formatted.replace(/\r\n/g, '\n');
-        
-        // Look for file listings without proper line breaks
-        // This handles cases where file names are adjacent without spaces
-        formatted = formatted.replace(/([a-zA-Z0-9_\-\.]+)([a-zA-Z0-9_\-\.]+)/g, function(match, p1, p2) {
-            // Only add a newline if it looks like two different filenames
-            if (p1.length > 1 && p2.length > 1) {
-                return p1 + '\n' + p2;
-            }
-            return match;
-        });
-        
-        // Look for common filename patterns that should be on separate lines
-        formatted = formatted.replace(/(^|\s)(app\.py|routes|static|templates|transfers|captures|data|logs|modules|gunicorn_config\.py|__pycache__|README\.md)(\s|$)/g, 
-            function(match, before, file, after) {
-                // If it's not already at the start of a line, add a newline before
-                if (before && before !== '\n') {
-                    return before + '\n' + file + after;
-                }
-                // If it's not already at the end of a line, add a newline after
-                if (after && after !== '\n') {
-                    return before + file + '\n' + after;
-                }
-                return match;
-            }
-        );
-        
-        // Handle ls -la output format (permissions, owner, group, etc.)
-        formatted = formatted.replace(/^(d|-)[rwx\-]{9}\s+\d+\s+\w+\s+\w+\s+\d+\s+\w+\s+\d+\s+[\d:]+\s+(.+)$/gm, '$1rwx-rwx-rwx user group size date $2');
-        
-        return formatted;
+    function clearTerminal() {
+        if (currentSessionId) {
+            const sessionTerminal = getOrCreateSessionTerminal(currentSessionId);
+            sessionTerminal.content = [];
+            
+            const terminal = document.getElementById('terminal-output');
+            terminal.innerHTML = '';
+        }
     }
     
-    // Update the visible text and cursor position as the user types or moves cursor
-    terminalInput.addEventListener('input', updateTerminalDisplay);
-    terminalInput.addEventListener('click', updateTerminalDisplay);
-    terminalInput.addEventListener('keyup', function(e) {
-        // Only update on navigation keys without modifiers to avoid interfering with shortcuts
-        if ((e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End') && 
-            !e.ctrlKey && !e.altKey && !e.metaKey) {
-            updateTerminalDisplay();
-        }
-    });
-
-    // Fix the click handling for the entire terminal container
-    terminal.addEventListener('click', function(e) {
-        // Always focus on input regardless of where click occurs
-        terminalInput.focus();
+    // Authentication modal functions
+    function showAuthModal() {
+        document.getElementById('auth-modal').style.display = 'flex';
+        document.getElementById('ssh-username').focus();
+    }
+    
+    function hideAuthModal() {
+        document.getElementById('auth-modal').style.display = 'none';
+        document.getElementById('auth-form').reset();
+        document.getElementById('auth-message').innerHTML = '';
+    }
+    
+    function testConnection() {
+        const host = document.getElementById('ssh-host').value;
+        const port = parseInt(document.getElementById('ssh-port').value);
+        const username = document.getElementById('ssh-username').value;
+        const password = document.getElementById('ssh-password').value;
         
-        // Mark terminal as focused
-        terminal.classList.add('focused');
-        
-        // Remove the focus message if it exists
-        const focusMsg = terminal.querySelector('.focus-message');
-        if (focusMsg) {
-            focusMsg.remove();
+        if (!username || !password) {
+            showAuthMessage('Please enter username and password', 'error');
+            return;
         }
         
-        // Prevent text selection when clicking directly on terminal background
-        if (e.target === terminal) {
-            e.preventDefault();
-        }
-    });
-
-    // Send a command when Enter is pressed
-    terminalInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            const command = terminalInput.value.trim();
-            
-            if (socket && socket.connected && !isProcessingCommand) {
-                isProcessingCommand = true;
-                
-                // Store the last command for special output formatting
-                window.lastCommand = command;
-                
-                // Add to history even if empty (allows blank lines)
-                if (commandHistory.length === 0 || commandHistory[commandHistory.length - 1] !== command) {
-                    commandHistory.push(command);
-                }
-                historyPosition = commandHistory.length;
-                
-                // Add the command with prompt to terminal content
-                terminalContent += currentPrompt + command + '\n';
-                
-                // Update display
-                updateTerminalDisplay();
-                
-                // Send to server (even if empty)
-                socket.emit('message', command);
-                
-                // Clear input
-                terminalInput.value = '';
-                
-                // Also clear the displayed text
-                const inputTextSpan = document.querySelector('.terminal-input-text');
-                if (inputTextSpan) {
-                    inputTextSpan.textContent = '';
-                }
+        showAuthMessage('Testing connection...', 'info');
+        
+        fetch('/ssh/test', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                host: host,
+                port: port,
+                username: username,
+                password: password
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAuthMessage('Connection test successful!', 'success');
+                } else {
+                showAuthMessage(`Connection test failed: ${data.error}`, 'error');
             }
-        } else if (e.key === 'ArrowUp') {
-            // Navigate command history
-            if (historyPosition > 0) {
-                historyPosition--;
-                terminalInput.value = commandHistory[historyPosition];
+        })
+        .catch(error => {
+            showAuthMessage(`Test error: ${error}`, 'error');
+        });
+    }
+    
+    function connectSSH() {
+        const host = document.getElementById('ssh-host').value;
+        const port = parseInt(document.getElementById('ssh-port').value);
+        const username = document.getElementById('ssh-username').value;
+        const password = document.getElementById('ssh-password').value;
+        
+        if (!username || !password) {
+            showAuthMessage('Please enter username and password', 'error');
+            return;
+        }
+        
+        const sessionId = generateSessionId();
+        
+        showAuthMessage('Connecting...', 'info');
+        
+        fetch('/ssh/connect', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                session_id: sessionId,
+                host: host,
+                port: port,
+                username: username,
+                password: password
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                showAuthMessage('Connected successfully!', 'success');
+                hideAuthModal();
+                refreshSessions();
                 
-                // Update the visible text
-                const inputTextSpan = document.querySelector('.terminal-input-text');
-                if (inputTextSpan) {
-                    inputTextSpan.textContent = terminalInput.value;
-                }
-                
-                // Put cursor at the end
+                // Auto-select the new session
                 setTimeout(() => {
-                    terminalInput.selectionStart = terminalInput.selectionEnd = terminalInput.value.length;
-                }, 0);
-            }
-            e.preventDefault();
-        } else if (e.key === 'ArrowDown') {
-            if (historyPosition < commandHistory.length - 1) {
-                historyPosition++;
-                terminalInput.value = commandHistory[historyPosition];
+                    selectSession(sessionId);
+                }, 1000);
             } else {
-                historyPosition = commandHistory.length;
-                terminalInput.value = '';
+                showAuthMessage(`Connection failed: ${data.error}`, 'error');
             }
-            
-            // Update the visible text
-            const inputTextSpan = document.querySelector('.terminal-input-text');
-            if (inputTextSpan) {
-                inputTextSpan.textContent = terminalInput.value;
-            }
-            
-            e.preventDefault();
-        } else if (e.key === 'Tab') {
-            e.preventDefault();
-            
-            // Get current command being typed
-            const currentInput = terminalInput.value;
-            const cursorPos = terminalInput.selectionStart;
-            
-            // Only attempt tab completion if we have a connection and aren't processing a command
-            if (socket && socket.connected && !isProcessingCommand) {
-                // Save the current input to restore if needed
-                const savedInput = currentInput;
-                const savedCursorPos = cursorPos;
-                
-                // Extract the partial path at cursor position for completion
-                let pathToComplete = '';
-                let startPos = cursorPos;
-                
-                // Find the beginning of the current word/path
-                for (let i = cursorPos - 1; i >= 0; i--) {
-                    if (currentInput[i] === ' ' || currentInput[i] === ';' || currentInput[i] === '|') {
-                        break;
-                    }
-                    startPos = i;
+        })
+        .catch(error => {
+            showAuthMessage(`Connection error: ${error}`, 'error');
+        });
+    }
+    
+    function showAuthMessage(message, type) {
+        const messageDiv = document.getElementById('auth-message');
+        messageDiv.innerHTML = `<div class="${type}-message">${message}</div>`;
+    }
+    
+    function generateSessionId() {
+        return Math.random().toString(36).substring(2, 15) + 
+               Math.random().toString(36).substring(2, 15);
+    }
+    
+    // Session list management
+    function refreshSessions() {
+        fetch('/ssh/sessions')
+            .then(response => response.json())
+            .then(data => {
+            if (data.success) {
+                updateSessionList(data.sessions);
                 }
-                
-                // Extract the partial path
-                pathToComplete = currentInput.substring(startPos, cursorPos);
-                
-                // Request tab completion from server
-                socket.emit('tab_completion', {
-                    command: currentInput,
-                    cursorPos: cursorPos,
-                    pathToComplete: pathToComplete
-                });
-                
-                // Set up one-time handler for tab completion response
-                socket.once('tab_completion_result', function(result) {
-                    if (result && result.completions && result.completions.length > 0) {
-                        if (result.completions.length === 1) {
-                            // Single match - auto-complete the command
-                            const completion = result.completions[0];
-                            
-                            // Replace the partial path with the full completion
-                            const newValue = currentInput.substring(0, startPos) + 
-                                            completion + 
-                                            currentInput.substring(cursorPos);
-                            
-                            terminalInput.value = newValue;
-                            terminalInput.selectionStart = terminalInput.selectionEnd = 
-                                startPos + completion.length;
-                            
-                            // Update the display
-                            updateTerminalDisplay();
-                        } else {
-                            // Multiple matches - show options
-                            terminalContent += '\n' + result.completions.join('    ') + '\n' + currentPrompt + savedInput;
-                            updateTerminalDisplay();
-                            
-                            // Restore cursor position
-                            terminalInput.selectionStart = terminalInput.selectionEnd = savedCursorPos;
-                        }
-                    }
-                });
+            })
+            .catch(error => {
+            console.error('Error refreshing sessions:', error);
+        });
+    }
+    
+    function updateSessionList(sessionList) {
+        sessions = sessionList;
+        const container = document.getElementById('session-list');
+        container.innerHTML = '';
+        
+        if (sessionList.length === 0) {
+            container.innerHTML = `
+                <div style="padding: 20px; text-align: center; color: var(--text-muted);">
+                    No SSH sessions active<br>
+                    <small>Click "New SSH Session" to connect</small>
+                </div>
+            `;
+            return;
+        }
+        
+        sessionList.forEach(session => {
+            const item = document.createElement('div');
+            item.className = 'session-item';
+            if (session.connected) item.classList.add('connected');
+            if (selectedSession && selectedSession.session_id === session.session_id) {
+                item.classList.add('selected');
             }
-        }
-    });
+            
+            item.innerHTML = `
+                <div class="session-info">
+                    <div class="session-details">
+                        <div class="session-name">${session.username}@${session.host}:${session.port}</div>
+                        <div class="session-path">Session ID: ${session.session_id}</div>
+                    </div>
+                    <div class="session-status">
+                        <span class="status-indicator ${session.connected ? 'status-connected' : 'status-disconnected'}"></span>
+                    </div>
+                </div>
+            `;
+            
+            item.addEventListener('click', () => selectSession(session.session_id));
+            container.appendChild(item);
+        });
+    }
     
-    // Clear terminal button
-    document.getElementById('clear-terminal').addEventListener('click', function() {
-        terminalContent = '';
-        commandHistory = [];
-        historyPosition = -1;
+    // Select a session
+    function selectSession(sessionId) {
+        const session = sessions.find(s => s.session_id === sessionId);
+        if (!session) return;
         
-        // Disconnect and reconnect to the socket
-        if (socket) {
-            socket.disconnect();
+        selectedSession = session;
+        currentSessionId = sessionId;
+        
+        // Update selected session info
+        document.getElementById('selected-session-info').textContent = 
+            `Connected: ${session.username}@${session.host}:${session.port}`;
+        
+        // Load terminal history for this session
+        loadSessionTerminal(sessionId);
+        
+        // Join the session room for output broadcasting
+        socket.emit('join_session', {session_id: sessionId});
+        
+        // Update UI
+        updateSessionList(sessions);
+        updateControlStates();
+        
+        // Focus terminal if connected
+        if (session.connected) {
+            document.getElementById('terminal-output').focus();
         }
-        
-        // Reset the terminal
-        updateTerminalDisplay();
-        
-        // Set up a new connection
-        setupWebSocket();
-    });
+    }
     
-    // Download terminal output
-    document.getElementById('download-output').addEventListener('click', function() {
-        // Create a blob with the terminal content
-        const blob = new Blob([terminalContent], { type: 'text/plain' });
+    // Update control button states
+    function updateControlStates() {
+        const disconnectBtn = document.getElementById('disconnect-btn');
+        const downloadBtn = document.getElementById('download-btn');
         
-        // Create a URL for the blob
-        const url = URL.createObjectURL(blob);
+        if (selectedSession && selectedSession.connected) {
+            disconnectBtn.disabled = false;
+            downloadBtn.disabled = false;
+                } else {
+            disconnectBtn.disabled = true;
+            downloadBtn.disabled = true;
+        }
+    }
+    
+    // Disconnect from selected session
+    function disconnectSession() {
+        if (!selectedSession) return;
         
-        // Create a link element
+        fetch('/ssh/disconnect', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+                session_id: selectedSession.session_id
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                addTerminalOutput(`Disconnected from ${selectedSession.username}@${selectedSession.host}\n`, 'info');
+                refreshSessions();
+                selectedSession = null;
+                currentSessionId = null;
+                updateControlStates();
+                
+                // Update UI
+                document.getElementById('selected-session-info').textContent = 'No session selected';
+            } else {
+                addTerminalOutput(`Error disconnecting: ${data.error}\n`, 'error');
+                }
+            })
+            .catch(error => {
+            addTerminalOutput(`Error: ${error}\n`, 'error');
+        });
+    }
+    
+    // Disconnect all sessions
+    function disconnectAll() {
+        if (confirm('Are you sure you want to disconnect from all SSH sessions?')) {
+            // Implement disconnect all functionality
+            addTerminalOutput('Disconnecting from all sessions...\n', 'info');
+            refreshSessions();
+        }
+    }
+    
+    // Download session output
+    function downloadOutput() {
+        if (!currentSessionId || !selectedSession) return;
+        
+        const sessionTerminal = getOrCreateSessionTerminal(currentSessionId);
+        const content = sessionTerminal.content.join('\n');
+        
+        const blob = new Blob([content], { type: 'text/plain' });
+        const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
-        
-        // Get current date and time for filename
-        const date = new Date();
-        const timestamp = date.toISOString().replace(/[:.]/g, '-').replace('T', '_').split('Z')[0];
-        
-        // Set download attribute and href
-        a.download = `console_output_${timestamp}.txt`;
         a.href = url;
-        
-        // Append to body, click, and remove
+        a.download = `ssh_session_${selectedSession.username}_${selectedSession.host}_${new Date().toISOString().slice(0,19).replace(/:/g,'-')}.txt`;
         document.body.appendChild(a);
         a.click();
-        
-        // Clean up
-        setTimeout(() => {
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }, 100);
-    });
-    
-    // Initialize the terminal - wrapped in a function to prevent duplicate initialization
-    let initialized = false;
-    function initializeTerminal() {
-        if (initialized) return;
-        initialized = true;
-        
-        setupWebSocket();
-        
-        // Make the entire terminal area clickable to focus input
-        terminal.addEventListener('mousedown', function(e) {
-            // Prevent default to avoid text selection issues
-            if (e.target === terminal) {
-                e.preventDefault();
-            }
-            
-            // Focus the input field when clicking anywhere in the terminal
-            terminalInput.focus();
-            
-            // Add visual indication that terminal is focused
-            terminal.classList.add('focused');
-        });
-        
-        // Handle focus and blur events for visual feedback
-        terminalInput.addEventListener('focus', function() {
-            terminal.classList.add('focused');
-            
-            // Remove focus message if it exists
-            const focusMsg = terminal.querySelector('.focus-message');
-            if (focusMsg) {
-                focusMsg.remove();
-            }
-        });
-        
-        terminalInput.addEventListener('blur', function() {
-            terminal.classList.remove('focused');
-            
-            // Add a more prominent message when terminal loses focus
-            // Remove existing message if it exists
-            const existingMsg = terminal.querySelector('.focus-message');
-            if (existingMsg) {
-                existingMsg.remove();
-            }
-            
-            // Create new focus message
-            const focusMsg = document.createElement('div');
-            focusMsg.className = 'focus-message';
-            focusMsg.textContent = 'Click to resume terminal session';
-            terminal.appendChild(focusMsg);
-        });
-        
-        // Add CSS to the head for terminal focus styling
-        const style = document.createElement('style');
-        style.textContent = `
-            .terminal.focused {
-                border-color: #3498db;
-            }
-            
-            .terminal {
-                cursor: text;
-            }
-        `;
-        document.head.appendChild(style);
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
     }
-    
-    // Only initialize once when page loads
-    window.addEventListener('load', initializeTerminal);
-    
-    // VNC functionality
-    const startVncBtn = document.getElementById('start-vnc');
-    const stopVncBtn = document.getElementById('stop-vnc');
-    const vncStatus = document.getElementById('vnc-status').querySelector('.badge');
-    const vncViewerContainer = document.getElementById('vnc-viewer-container');
-    const vncIframe = document.getElementById('vnc-iframe');
-    const vncHost = document.getElementById('vnc-host');
-    
-    startVncBtn.addEventListener('click', function() {
-        startVncBtn.disabled = true;
-        startVncBtn.textContent = 'Starting...';
-        
-        fetch('/start_vnc', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                vncStatus.textContent = 'Running';
-                vncStatus.classList.remove('error');
-                vncStatus.classList.add('success');
-                startVncBtn.style.display = 'none';
-                stopVncBtn.style.display = 'inline-block';
-                vncViewerContainer.style.display = 'block';
-                vncHost.textContent = 'localhost';
-                
-                // Use our simple VNC viewer
-                console.log('Loading simple VNC viewer');
-                vncIframe.src = '/static/js/simple-vnc-viewer.html';
-            } else {
-                alert('Error: ' + data.message);
-                startVncBtn.textContent = 'Start VNC Server';
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to start VNC server');
-            startVncBtn.textContent = 'Start VNC Server';
-        })
-        .finally(() => {
-            startVncBtn.disabled = false;
-        });
-    });
-    
-    stopVncBtn.addEventListener('click', function() {
-        stopVncBtn.disabled = true;
-        stopVncBtn.textContent = 'Stopping...';
-        
-        fetch('/stop_vnc', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            }
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.success) {
-                vncStatus.textContent = 'Not Running';
-                vncStatus.classList.remove('success');
-                vncStatus.classList.add('error');
-                startVncBtn.style.display = 'inline-block';
-                stopVncBtn.style.display = 'none';
-                vncViewerContainer.style.display = 'none';
-                vncIframe.src = '';
-            } else {
-                alert('Error: ' + data.message);
-                stopVncBtn.textContent = 'Stop VNC Server';
-            }
-        })
-        .catch(error => {
-            console.error('Error:', error);
-            alert('Failed to stop VNC server');
-            stopVncBtn.textContent = 'Stop VNC Server';
-        })
-        .finally(() => {
-            stopVncBtn.disabled = false;
-        });
-    });
-
-    /* Add these functions to handle terminal settings */
-    // Toggle settings panel
-    document.getElementById('settings-toggle').addEventListener('click', function() {
-        const settingsPanel = document.getElementById('terminal-settings');
-        if (settingsPanel.style.display === 'none') {
-            settingsPanel.style.display = 'block';
-        } else {
-            settingsPanel.style.display = 'none';
-        }
-    });
-    
-    // Load saved settings
-    function loadTerminalSettings() {
-        // Default settings
-        let settings = {
-            fontSize: '14px',
-            colorScheme: 'green',
-            cursorStyle: 'block',
-            cursorBlink: 'true'
-        };
-        
-        // Try to load from localStorage
-        try {
-            const savedSettings = localStorage.getItem('terminalSettings');
-            if (savedSettings) {
-                settings = JSON.parse(savedSettings);
-                
-                // Apply saved values to the form
-                document.getElementById('terminal-font-size').value = settings.fontSize;
-                document.getElementById('terminal-color-scheme').value = settings.colorScheme;
-                document.getElementById('terminal-cursor-style').value = settings.cursorStyle;
-                document.getElementById('terminal-cursor-blink').value = settings.cursorBlink;
-            }
-        } catch (e) {
-            console.error('Error loading terminal settings:', e);
-        }
-        
-        // Apply settings
-        applyTerminalSettings(settings);
-    }
-    
-    // Apply terminal settings
-    function applyTerminalSettings(settings) {
-        // Apply font size
-        terminal.style.fontSize = settings.fontSize;
-        
-        // Apply color scheme
-        let textColor, bgColor, glowColor;
-        switch(settings.colorScheme) {
-            case 'amber':
-                textColor = '#FFBF00';
-                bgColor = '#121212';
-                glowColor = 'rgba(255, 191, 0, 0.07)';
-                break;
-            case 'white':
-                textColor = '#F0F0F0';
-                bgColor = '#121212';
-                glowColor = 'rgba(240, 240, 240, 0.07)';
-                break;
-            case 'blue':
-                textColor = '#4F9BFF';
-                bgColor = '#0C0C1A';
-                glowColor = 'rgba(79, 155, 255, 0.07)';
-                break;
-            default: // green
-                textColor = '#2ECC40';
-                bgColor = '#121212';
-                glowColor = 'rgba(46, 204, 64, 0.07)';
-        }
-        
-        terminal.style.color = textColor;
-        terminal.style.backgroundColor = bgColor;
-        
-        // Update glow effect
-        const glow = terminal.querySelector('.terminal-glow');
-        if (glow) {
-            glow.style.background = `radial-gradient(ellipse at center, ${glowColor} 0%, rgba(0, 0, 0, 0.2) 100%)`;
-        }
-        
-        // Update cursor style
-        const cursorCSS = `
-            .terminal-cursor {
-                width: ${settings.cursorStyle === 'bar' ? '2px' : '8px'};
-                height: ${settings.cursorStyle === 'underline' ? '2px' : '16px'};
-                background-color: ${textColor};
-                animation: ${settings.cursorBlink === 'true' ? 'blink 1s step-end infinite' : 'none'};
-                ${settings.cursorStyle === 'underline' ? 'margin-top: 14px;' : ''}
-            }
-        `;
-        
-        // Look for existing cursor style element or create new one
-        let cursorStyle = document.getElementById('cursor-style');
-        if (!cursorStyle) {
-            cursorStyle = document.createElement('style');
-            cursorStyle.id = 'cursor-style';
-            document.head.appendChild(cursorStyle);
-        }
-        
-        cursorStyle.textContent = cursorCSS;
-        
-        // Save settings to localStorage
-        localStorage.setItem('terminalSettings', JSON.stringify(settings));
-    }
-    
-    // Handle settings changes
-    document.querySelectorAll('.terminal-setting').forEach(element => {
-        element.addEventListener('change', function() {
-            const settings = {
-                fontSize: document.getElementById('terminal-font-size').value,
-                colorScheme: document.getElementById('terminal-color-scheme').value,
-                cursorStyle: document.getElementById('terminal-cursor-style').value,
-                cursorBlink: document.getElementById('terminal-cursor-blink').value
-            };
-            
-            applyTerminalSettings(settings);
-            
-            // Focus back on the terminal after changing settings
-            setTimeout(() => {
-                terminalInput.focus();
-            }, 0);
-        });
-    });
-    
-    // Initialize settings on page load
-    window.addEventListener('load', function() {
-        loadTerminalSettings();
-    });
 </script>
 {% endblock %} 
